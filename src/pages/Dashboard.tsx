@@ -36,11 +36,11 @@ const Dashboard: React.FC = () => {
   const [selectedToolCategory, setSelectedToolCategory] = useState<ToolCategory | 'all'>('all');
   const [filters, setFilters] = useState<FilterState>({
     search: '',
-    clientId: selectedClientId || '',
-    status: '',
-    taskType: '',
-    priority: '',
-    assignee: '',
+    clientId: selectedClientId || 'all',
+    status: 'all',
+    taskType: 'all',
+    priority: 'all',
+    assignee: 'all',
   });
   
   // Calculate dashboard metrics
@@ -101,27 +101,27 @@ const Dashboard: React.FC = () => {
       }
       
       // Client filter
-      if (filters.clientId && task.clientId !== filters.clientId) {
+      if (filters.clientId && filters.clientId !== 'all' && task.clientId !== filters.clientId) {
         return false;
       }
       
       // Status filter
-      if (filters.status && task.status !== filters.status) {
+      if (filters.status && filters.status !== 'all' && task.status !== filters.status) {
         return false;
       }
       
       // Task type filter
-      if (filters.taskType && task.type !== filters.taskType) {
+      if (filters.taskType && filters.taskType !== 'all' && task.type !== filters.taskType) {
         return false;
       }
       
       // Priority filter
-      if (filters.priority && task.priority !== filters.priority) {
+      if (filters.priority && filters.priority !== 'all' && task.priority !== filters.priority) {
         return false;
       }
       
       // Assignee filter
-      if (filters.assignee && task.assignedTo !== filters.assignee) {
+      if (filters.assignee && filters.assignee !== 'all' && task.assignedTo !== filters.assignee) {
         return false;
       }
       
@@ -132,11 +132,11 @@ const Dashboard: React.FC = () => {
   const handleClearFilters = () => {
     setFilters({
       search: '',
-      clientId: '',
-      status: '',
-      taskType: '',
-      priority: '',
-      assignee: '',
+      clientId: 'all',
+      status: 'all',
+      taskType: 'all',
+      priority: 'all',
+      assignee: 'all',
     });
   };
   

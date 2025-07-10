@@ -32,10 +32,10 @@ const QuickFilters: React.FC<QuickFiltersProps> = ({
     });
   };
   
-  const hasActiveFilters = Object.values(filters).some(value => value !== '');
+  const hasActiveFilters = Object.values(filters).some(value => value !== '' && value !== 'all');
   
   const statusOptions = [
-    { value: '', label: 'All Statuses' },
+    { value: 'all', label: 'All Statuses' },
     { value: TaskStatus.PENDING, label: 'Pending' },
     { value: TaskStatus.IN_PROGRESS, label: 'In Progress' },
     { value: TaskStatus.REVIEW, label: 'Review' },
@@ -45,7 +45,7 @@ const QuickFilters: React.FC<QuickFiltersProps> = ({
   ];
   
   const taskTypeOptions = [
-    { value: '', label: 'All Task Types' },
+    { value: 'all', label: 'All Task Types' },
     { value: TaskType.CONTENT_GENERATION, label: 'Content Generation' },
     { value: TaskType.STRATEGY_GENERATION, label: 'Strategy Generation' },
     { value: TaskType.MIGRATION_ANALYSIS, label: 'Migration Analysis' },
@@ -58,7 +58,7 @@ const QuickFilters: React.FC<QuickFiltersProps> = ({
   ];
   
   const priorityOptions = [
-    { value: '', label: 'All Priorities' },
+    { value: 'all', label: 'All Priorities' },
     { value: 'low', label: 'Low' },
     { value: 'medium', label: 'Medium' },
     { value: 'high', label: 'High' },
@@ -66,7 +66,7 @@ const QuickFilters: React.FC<QuickFiltersProps> = ({
   ];
   
   const clientOptions = [
-    { value: '', label: 'All Clients' },
+    { value: 'all', label: 'All Clients' },
     ...clients.map(client => ({
       value: client.id,
       label: client.name,
@@ -74,7 +74,7 @@ const QuickFilters: React.FC<QuickFiltersProps> = ({
   ];
   
   const assigneeOptions = [
-    { value: '', label: 'All Assignees' },
+    { value: 'all', label: 'All Assignees' },
     { value: 'automated', label: 'Automated' },
     { value: 'sarah.johnson@bangdigital.com.au', label: 'Sarah Johnson' },
     { value: 'mike.chen@bangdigital.com.au', label: 'Mike Chen' },

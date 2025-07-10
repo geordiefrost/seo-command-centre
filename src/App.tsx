@@ -63,20 +63,20 @@ function App() {
               element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} 
             />
             <Route
-              path="/*"
+              path="/"
               element={
                 isAuthenticated ? <Layout /> : <Navigate to="/login" replace />
               }
             >
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/strategy" element={<div className="p-6"><h1 className="text-2xl font-bold">Strategy Module - Coming Soon</h1></div>} />
-              <Route path="/content" element={<div className="p-6"><h1 className="text-2xl font-bold">Content Module - Coming Soon</h1></div>} />
-              <Route path="/migration" element={<div className="p-6"><h1 className="text-2xl font-bold">Migration Module - Coming Soon</h1></div>} />
-              <Route path="/monitoring" element={<div className="p-6"><h1 className="text-2xl font-bold">Monitoring Module - Coming Soon</h1></div>} />
-              <Route path="/competitive" element={<div className="p-6"><h1 className="text-2xl font-bold">Competitive Module - Coming Soon</h1></div>} />
-              <Route path="/automation" element={<div className="p-6"><h1 className="text-2xl font-bold">Automation Module - Coming Soon</h1></div>} />
-              <Route path="/reports" element={<div className="p-6"><h1 className="text-2xl font-bold">Reports Module - Coming Soon</h1></div>} />
-              <Route path="/settings" element={<div className="p-6"><h1 className="text-2xl font-bold">Settings - Coming Soon</h1></div>} />
+              <Route index element={<Dashboard />} />
+              <Route path="strategy" element={<div className="p-6"><h1 className="text-2xl font-bold">Strategy Module - Coming Soon</h1></div>} />
+              <Route path="content" element={<div className="p-6"><h1 className="text-2xl font-bold">Content Module - Coming Soon</h1></div>} />
+              <Route path="migration" element={<div className="p-6"><h1 className="text-2xl font-bold">Migration Module - Coming Soon</h1></div>} />
+              <Route path="monitoring" element={<div className="p-6"><h1 className="text-2xl font-bold">Monitoring Module - Coming Soon</h1></div>} />
+              <Route path="competitive" element={<div className="p-6"><h1 className="text-2xl font-bold">Competitive Module - Coming Soon</h1></div>} />
+              <Route path="automation" element={<div className="p-6"><h1 className="text-2xl font-bold">Automation Module - Coming Soon</h1></div>} />
+              <Route path="reports" element={<div className="p-6"><h1 className="text-2xl font-bold">Reports Module - Coming Soon</h1></div>} />
+              <Route path="settings" element={<div className="p-6"><h1 className="text-2xl font-bold">Settings - Coming Soon</h1></div>} />
             </Route>
           </Routes>
         </div>

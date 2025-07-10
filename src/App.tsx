@@ -5,7 +5,7 @@ import { useAppStore } from './store/appStore';
 import { useToolStore } from './store/toolStore';
 import { useIntegrationStore } from './store/integrationStore';
 import { Layout } from './components/layout';
-import { Dashboard, Login } from './pages';
+import { Dashboard, Login, Strategy } from './pages';
 import { mockClients, mockTasks, mockTools, mockIntegrationData } from './mock';
 
 const queryClient = new QueryClient({
@@ -69,7 +69,7 @@ function App() {
               }
             >
               <Route index element={<Dashboard />} />
-              <Route path="strategy" element={<div className="p-6"><h1 className="text-2xl font-bold">Strategy Module - Coming Soon</h1></div>} />
+              <Route path="strategy" element={<Strategy />} />
               <Route path="content" element={<div className="p-6"><h1 className="text-2xl font-bold">Content Module - Coming Soon</h1></div>} />
               <Route path="migration" element={<div className="p-6"><h1 className="text-2xl font-bold">Migration Module - Coming Soon</h1></div>} />
               <Route path="monitoring" element={<div className="p-6"><h1 className="text-2xl font-bold">Monitoring Module - Coming Soon</h1></div>} />

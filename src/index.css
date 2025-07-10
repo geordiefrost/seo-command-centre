@@ -16,15 +16,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-secondary;
+  background-color: #f3f4f6;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground rounded-md;
+  background-color: #9ca3af;
+  border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-foreground;
+  background-color: #4b5563;
 }
 
 /* Animation classes */

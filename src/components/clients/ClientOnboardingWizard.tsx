@@ -85,6 +85,7 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
   const [isGoogleAuthenticated, setIsGoogleAuthenticated] = useState(GoogleOAuthService.isAuthenticated());
   const [availableGSCProperties, setAvailableGSCProperties] = useState<Array<{value: string, label: string}>>([]);
   const [isLoadingGSCProperties, setIsLoadingGSCProperties] = useState(false);
+  const [gscLookupStatus, setGscLookupStatus] = useState<'none' | 'loading' | 'found' | 'not-found' | 'error'>('none');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -141,11 +142,30 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
     }
   };
 
-  const handleWebsiteChange = (url: string) => {
+  const handleWebsiteChange = async (url: string) => {
     updateFormData('websiteUrl', url);
     if (url) {
       const domain = extractDomainFromUrl(url);
       updateFormData('domain', domain);
+      
+      // Auto-lookup Google Search Console property if authenticated
+      if (isGoogleAuthenticated) {
+        setGscLookupStatus('loading');
+        try {
+          const gscProperty = await GoogleOAuthService.findPropertyForDomain(domain);
+          if (gscProperty) {
+            updateFormData('searchConsolePropertyId', gscProperty);
+            setGscLookupStatus('found');
+          } else {
+            setGscLookupStatus('not-found');
+          }
+        } catch (error) {
+          console.error('GSC property lookup failed:', error);
+          setGscLookupStatus('error');
+        }
+      }
+    } else {
+      setGscLookupStatus('none');
     }
   };
 
@@ -154,10 +174,14 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
 
     setIsCrawling(true);
     try {
-      const insights = await FirecrawlService.quickCrawl(formData.websiteUrl);
+      // Use fullCrawl with 20 page limit instead of quickCrawl (1 page)
+      const results = await FirecrawlService.fullCrawl(formData.websiteUrl, { maxPages: 20 });
+      
+      // Convert full crawl results to insights format
+      const insights = FirecrawlService.convertCrawlToInsights(results);
       setCrawlInsights(insights);
     } catch (error) {
-      console.error('Quick crawl failed:', error);
+      console.error('Website crawl failed:', error);
     } finally {
       setIsCrawling(false);
     }
@@ -290,9 +314,9 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
           .from('client_crawl_data')
           .insert([{
             client_id: clientId,
-            crawl_type: 'quick',
+            crawl_type: 'full',
             status: 'completed',
-            pages_analyzed: 1,
+            pages_analyzed: crawlInsights.pagesAnalyzed || 20,
             insights: crawlInsights
           }]);
 
@@ -475,6 +499,43 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
                 value={formData.searchConsolePropertyId}
                 onChange={(e) => updateFormData('searchConsolePropertyId', e.target.value)}
               />
+              {gscLookupStatus === 'loading' && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-blue-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Looking up Google Search Console property...
+                </div>
+              )}
+              {gscLookupStatus === 'found' && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  Found and auto-filled Search Console property!
+                </div>
+              )}
+              {gscLookupStatus === 'not-found' && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-orange-600">
+                  <AlertCircle className="h-4 w-4" />
+                  No Search Console property found for this domain
+                </div>
+              )}
+              {gscLookupStatus === 'error' && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-red-600">
+                  <AlertCircle className="h-4 w-4" />
+                  Error looking up Search Console property
+                </div>
+              )}
+              {!isGoogleAuthenticated && formData.domain && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                  <Info className="h-4 w-4" />
+                  <span>Sign in to Google to auto-lookup Search Console properties</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => GoogleOAuthService.initiateOAuth()}
+                  >
+                    Sign in to Google
+                  </Button>
+                </div>
+              )}
             </div>
 
             {formData.websiteUrl && (
@@ -484,8 +545,8 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
                   <h4 className="font-medium text-blue-900">Quick Website Analysis</h4>
                 </div>
                 <p className="text-sm text-blue-700 mb-4">
-                  Get instant SEO insights from your client's homepage - page title, meta description, 
-                  content analysis, and technical SEO recommendations. This analyzes just the homepage (1 page).
+                  Get comprehensive SEO insights from your client's website - page titles, meta descriptions, 
+                  content analysis, and technical SEO recommendations. This analyzes up to 20 pages of the website.
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -836,97 +897,113 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Client Onboarding</h1>
-        <p className="text-gray-600">
-          Add a new client with automated website analysis and setup
-        </p>
+    <div className="flex flex-col h-screen max-h-screen overflow-hidden">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-6 sm:px-6">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Client Onboarding</h1>
+          <p className="text-sm sm:text-base text-gray-600">
+            Add a new client with automated website analysis and setup
+          </p>
+        </div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          {STEPS.map((step, index) => {
-            const Icon = step.icon;
-            const isActive = index === currentStep;
-            const isCompleted = index < currentStep;
-            
-            return (
-              <div
-                key={step.id}
-                className={`flex items-center ${index < STEPS.length - 1 ? 'flex-1' : ''}`}
-              >
-                <div className="flex flex-col items-center">
-                  <div className={`
-                    w-10 h-10 rounded-full flex items-center justify-center border-2 
-                    ${isActive ? 'bg-primary-500 border-primary-500 text-white' : 
-                      isCompleted ? 'bg-green-500 border-green-500 text-white' : 
-                      'bg-gray-100 border-gray-300 text-gray-400'}
-                  `}>
-                    {isCompleted ? (
-                      <CheckCircle className="h-5 w-5" />
-                    ) : (
-                      <Icon className="h-5 w-5" />
+      {/* Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+        <div className="max-w-4xl mx-auto">
+
+          {/* Progress Steps */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4 overflow-x-auto">
+              {STEPS.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = index === currentStep;
+                const isCompleted = index < currentStep;
+                
+                return (
+                  <div
+                    key={step.id}
+                    className={`flex items-center ${index < STEPS.length - 1 ? 'flex-1' : ''} min-w-0`}
+                  >
+                    <div className="flex flex-col items-center">
+                      <div className={`
+                        w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 
+                        ${isActive ? 'bg-primary-500 border-primary-500 text-white' : 
+                          isCompleted ? 'bg-green-500 border-green-500 text-white' : 
+                          'bg-gray-100 border-gray-300 text-gray-400'}
+                      `}>
+                        {isCompleted ? (
+                          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                        ) : (
+                          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                        )}
+                      </div>
+                      <span className={`text-xs mt-1 text-center hidden sm:block ${isActive ? 'text-primary-600 font-medium' : 
+                        isCompleted ? 'text-green-600' : 'text-gray-400'}`}>
+                        {step.title}
+                      </span>
+                    </div>
+                    {index < STEPS.length - 1 && (
+                      <div className={`flex-1 h-0.5 mx-2 sm:mx-4 ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}`} />
                     )}
                   </div>
-                  <span className={`text-xs mt-1 ${isActive ? 'text-primary-600 font-medium' : 
-                    isCompleted ? 'text-green-600' : 'text-gray-400'}`}>
-                    {step.title}
-                  </span>
-                </div>
-                {index < STEPS.length - 1 && (
-                  <div className={`flex-1 h-0.5 mx-4 ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}`} />
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Step Content */}
+          <Card className="p-4 sm:p-6 mb-6">
+            <div className="mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                {STEPS[currentStep].title}
+              </h2>
+              <p className="text-sm sm:text-base text-gray-600">{STEPS[currentStep].description}</p>
+            </div>
+
+            {renderStep()}
+          </Card>
         </div>
       </div>
 
-      {/* Step Content */}
-      <Card className="p-6 mb-6">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            {STEPS[currentStep].title}
-          </h2>
-          <p className="text-gray-600">{STEPS[currentStep].description}</p>
-        </div>
-
-        {renderStep()}
-      </Card>
-
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={currentStep === 0 ? onCancel : prevStep}
-          icon={currentStep === 0 ? X : ChevronLeft}
-        >
-          {currentStep === 0 ? 'Cancel' : 'Previous'}
-        </Button>
-
-        <div className="flex space-x-2">
-          {currentStep < STEPS.length - 1 ? (
+      {/* Navigation - Fixed at Bottom */}
+      <div className="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-4 sm:px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between">
             <Button
-              onClick={nextStep}
-              disabled={!canProceed()}
-              icon={ChevronRight}
+              variant="outline"
+              onClick={currentStep === 0 ? onCancel : prevStep}
+              icon={currentStep === 0 ? X : ChevronLeft}
+              className="text-sm sm:text-base"
             >
-              Next Step
+              {currentStep === 0 ? 'Cancel' : 'Previous'}
             </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={!canProceed() || isSubmitting}
-              icon={isSubmitting ? Loader2 : CheckCircle}
-            >
-              {isSubmitting 
-                ? (initialData?.id ? 'Updating Client...' : 'Creating Client...') 
-                : (initialData?.id ? 'Update Client' : 'Create Client')
-              }
-            </Button>
-          )}
+
+            <div className="flex space-x-2">
+              {currentStep < STEPS.length - 1 ? (
+                <Button
+                  onClick={nextStep}
+                  disabled={!canProceed()}
+                  icon={ChevronRight}
+                  className="text-sm sm:text-base"
+                >
+                  Next Step
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!canProceed() || isSubmitting}
+                  icon={isSubmitting ? Loader2 : CheckCircle}
+                  className="text-sm sm:text-base"
+                >
+                  {isSubmitting 
+                    ? (initialData?.id ? 'Updating...' : 'Creating...') 
+                    : (initialData?.id ? 'Update Client' : 'Create Client')
+                  }
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

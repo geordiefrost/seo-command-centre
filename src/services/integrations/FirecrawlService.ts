@@ -38,6 +38,7 @@ export interface QuickCrawlInsights {
   seoScore: number;
   issues: string[];
   recommendations: string[];
+  pagesAnalyzed?: number;
 }
 
 class FirecrawlService {
@@ -445,6 +446,133 @@ class FirecrawlService {
     }
     
     return this.callAPI('/sitemap/analyze', { sitemapUrl });
+  }
+  
+  /**
+   * Convert full crawl results to insights format for UI display
+   */
+  convertCrawlToInsights(results: FirecrawlResult[]): QuickCrawlInsights {
+    if (!results || results.length === 0) {
+      return {
+        title: 'No data available',
+        description: 'No pages were crawled successfully',
+        wordCount: 0,
+        h1: '',
+        h2Count: 0,
+        h3Count: 0,
+        imageCount: 0,
+        linkCount: 0,
+        hasSchemaMarkup: false,
+        techStack: [],
+        seoScore: 0,
+        issues: ['No pages crawled'],
+        recommendations: ['Try crawling again'],
+        pagesAnalyzed: 0
+      };
+    }
+
+    // Use the first page as the primary page for title/description
+    const primaryPage = results[0];
+    
+    // Aggregate data from all pages
+    const totalWordCount = results.reduce((sum, page) => sum + page.wordCount, 0);
+    const totalImages = results.reduce((sum, page) => sum + (page.images?.length || 0), 0);
+    const totalLinks = results.reduce((sum, page) => sum + (page.links?.length || 0), 0);
+    const totalH2 = results.reduce((sum, page) => sum + (page.h2?.length || 0), 0);
+    const totalH3 = results.reduce((sum, page) => sum + (page.h3?.length || 0), 0);
+    
+    // Detect common tech stack across pages
+    const techStackDetected = new Set<string>();
+    results.forEach(page => {
+      const tech = this.detectTechStack(page.content);
+      tech.forEach(t => techStackDetected.add(t));
+    });
+    
+    // Calculate overall SEO score
+    const individualScores = results.map(page => this.calculateSEOScore(page));
+    const avgSeoScore = individualScores.reduce((sum, score) => sum + score, 0) / individualScores.length;
+    
+    // Collect issues from all pages
+    const allIssues = new Set<string>();
+    results.forEach(page => {
+      const issues = this.getSEOIssues(page);
+      issues.forEach(issue => allIssues.add(issue));
+    });
+    
+    // Generate recommendations
+    const recommendations = this.generateRecommendations(results);
+    
+    return {
+      title: primaryPage.title || 'Untitled Page',
+      description: primaryPage.description || 'No description available',
+      wordCount: totalWordCount,
+      h1: primaryPage.h1 || '',
+      h2Count: totalH2,
+      h3Count: totalH3,
+      imageCount: totalImages,
+      linkCount: totalLinks,
+      hasSchemaMarkup: results.some(page => this.detectSchemaMarkup(page.content)),
+      techStack: Array.from(techStackDetected),
+      seoScore: Math.round(avgSeoScore),
+      issues: Array.from(allIssues),
+      recommendations,
+      pagesAnalyzed: results.length
+    };
+  }
+  
+  private calculateSEOScore(page: FirecrawlResult): number {
+    let score = 100;
+    
+    if (!page.title) score -= 15;
+    else if (page.title.length < 30 || page.title.length > 60) score -= 10;
+    
+    if (!page.description) score -= 10;
+    else if (page.description.length < 120 || page.description.length > 160) score -= 5;
+    
+    if (!page.h1) score -= 15;
+    if (page.wordCount < 300) score -= 10;
+    
+    return Math.max(0, score);
+  }
+  
+  private getSEOIssues(page: FirecrawlResult): string[] {
+    const issues: string[] = [];
+    
+    if (!page.title) issues.push('Missing page title');
+    else if (page.title.length < 30) issues.push('Title too short');
+    else if (page.title.length > 60) issues.push('Title too long');
+    
+    if (!page.description) issues.push('Missing meta description');
+    else if (page.description.length < 120) issues.push('Meta description too short');
+    else if (page.description.length > 160) issues.push('Meta description too long');
+    
+    if (!page.h1) issues.push('Missing H1 tag');
+    if (page.wordCount < 300) issues.push('Low word count');
+    
+    return issues;
+  }
+  
+  private generateRecommendations(results: FirecrawlResult[]): string[] {
+    const recommendations: string[] = [];
+    const pagesWithoutTitles = results.filter(p => !p.title).length;
+    const pagesWithoutDescriptions = results.filter(p => !p.description).length;
+    const pagesWithoutH1 = results.filter(p => !p.h1).length;
+    
+    if (pagesWithoutTitles > 0) {
+      recommendations.push(`Add titles to ${pagesWithoutTitles} pages`);
+    }
+    if (pagesWithoutDescriptions > 0) {
+      recommendations.push(`Add meta descriptions to ${pagesWithoutDescriptions} pages`);
+    }
+    if (pagesWithoutH1 > 0) {
+      recommendations.push(`Add H1 tags to ${pagesWithoutH1} pages`);
+    }
+    
+    recommendations.push('Review internal linking structure');
+    recommendations.push('Optimize images with alt text');
+    recommendations.push('Implement schema markup');
+    
+    return recommendations;
   }
   
   private async callAPI(endpoint: string, data: any = {}, method: string = 'POST'): Promise<any> {

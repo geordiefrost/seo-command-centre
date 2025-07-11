@@ -7,3 +7,4 @@ export { default as Input } from './Input';
 export { default as Select } from './Select';
 export { default as ProgressBar } from './ProgressBar';
 export { LoadingSpinner, LoadingOverlay } from './LoadingSpinner';
+export { ErrorBoundary, withErrorBoundary } from './ErrorBoundary';

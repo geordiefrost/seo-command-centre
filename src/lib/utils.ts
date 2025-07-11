@@ -40,6 +40,10 @@ export function formatRelativeTime(date: Date | string): string {
 }
 
 export function formatNumber(num: number): string {
+  return new Intl.NumberFormat('en-AU').format(num);
+}
+
+export function formatNumberShort(num: number): string {
   if (num >= 1000000) {
     return (num / 1000000).toFixed(1) + 'M';
   }
@@ -53,10 +57,10 @@ export function formatPercentage(num: number): string {
   return `${Math.round(num)}%`;
 }
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number, currency: string = 'AUD'): string {
   return new Intl.NumberFormat('en-AU', {
     style: 'currency',
-    currency: 'AUD',
+    currency: currency,
   }).format(amount);
 }
 
@@ -241,4 +245,14 @@ export function generateRandomColor(): string {
     '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
   ];
   return colors[Math.floor(Math.random() * colors.length)];
+}
+
+export function capitalize(str: string): string {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+export function truncate(str: string, length: number, suffix: string = '...'): string {
+  if (str.length <= length) return str;
+  return str.substring(0, length) + suffix;
 }

@@ -161,8 +161,11 @@ ALTER TABLE integrations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own data" ON users FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own data" ON users FOR UPDATE USING (auth.uid() = id);
 
--- All authenticated users can read clients
+-- All authenticated users can read and modify clients
 CREATE POLICY "All users can view clients" ON clients FOR SELECT TO authenticated USING (true);
+CREATE POLICY "All users can insert clients" ON clients FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "All users can update clients" ON clients FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "All users can delete clients" ON clients FOR DELETE TO authenticated USING (true);
 
 -- All authenticated users can read and modify tasks
 CREATE POLICY "All users can view tasks" ON tasks FOR SELECT TO authenticated USING (true);

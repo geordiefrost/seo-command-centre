@@ -15,7 +15,9 @@ import {
   Loader2,
   AlertCircle,
   Zap,
-  Bot
+  Bot,
+  HelpCircle,
+  Info
 } from 'lucide-react';
 import { Card, Button, Input, Select } from '../common';
 import { useAppStore } from '../../store/appStore';
@@ -34,31 +36,31 @@ const STEPS: OnboardingStep[] = [
   {
     id: 'basic',
     title: 'Basic Information',
-    description: 'Tell us about your client',
+    description: 'Company details and business model',
     icon: Building
   },
   {
     id: 'website',
-    title: 'Website & Domain',
-    description: 'Website details and quick analysis',
+    title: 'Website Analysis',
+    description: 'Website URL and instant SEO insights',
     icon: Globe
   },
   {
     id: 'market',
-    title: 'Market & Competitors',
-    description: 'Target markets and competitors',
+    title: 'Target Audience',
+    description: 'Geographic markets and key competitors',
     icon: Target
   },
   {
     id: 'contacts',
-    title: 'Contacts & Brand',
+    title: 'Contacts & Brand (Optional)',
     description: 'Key contacts and brand terms',
     icon: Users
   },
   {
     id: 'complete',
     title: 'Complete Setup',
-    description: 'Review and create client',
+    description: 'Review and create client profile',
     icon: CheckCircle
   }
 ];
@@ -498,27 +500,33 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
                 Google Search Console Property ID
               </label>
               <Input
-                placeholder="Optional GSC property ID"
+                placeholder="Optional - we can help you find this"
                 value={formData.searchConsolePropertyId}
                 onChange={(e) => updateFormData('searchConsolePropertyId', e.target.value)}
               />
             </div>
 
             {formData.websiteUrl && (
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-blue-900 flex items-center">
-                    <Zap className="h-4 w-4 mr-2" />
-                    Quick Website Analysis
-                  </h4>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="h-5 w-5 text-blue-600" />
+                  <h4 className="font-medium text-blue-900">Quick Website Analysis</h4>
+                </div>
+                <p className="text-sm text-blue-700 mb-4">
+                  Get instant SEO insights from your client's homepage - page title, meta description, 
+                  content analysis, and technical SEO recommendations. This analyzes just the homepage (1 page).
+                </p>
+                <div className="flex items-center gap-2">
                   <Button
                     onClick={handleQuickCrawl}
                     disabled={isCrawling}
                     size="sm"
                     icon={isCrawling ? Loader2 : Bot}
+                    className="bg-blue-600 hover:bg-blue-700"
                   >
-                    {isCrawling ? 'Analyzing...' : 'Analyze Website'}
+                    {isCrawling ? 'Analyzing Homepage...' : 'Analyze Homepage'}
                   </Button>
+                  <span className="text-xs text-blue-600">Takes 5-10 seconds</span>
                 </div>
 
                 {crawlInsights && (
@@ -574,13 +582,25 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Target Markets
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Target Audience Segments
+                </label>
+                <div className="group relative">
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                  <div className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-80 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
+                    Specific geographic areas, demographics, or market segments your client wants to target. 
+                    This helps with local SEO and content strategy. Different from business model (B2B/B2C) above.
+                    <div className="mt-2 text-gray-300">
+                      <strong>Examples:</strong> "Sydney CBD professionals", "Melbourne families", "National tech startups", "Brisbane healthcare"  
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <Input
-                    placeholder="Add target market (e.g., Australia, New Zealand)"
+                    placeholder="e.g., Sydney CBD professionals, Melbourne families, National B2B tech companies"
                     value={newMarket}
                     onChange={(e) => setNewMarket(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addMarket())}
@@ -618,9 +638,17 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Competitors
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Main Competitors
+                </label>
+                <div className="group relative">
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                  <div className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
+                    Top 3-5 competitors in your client's space. We'll use these for competitive keyword analysis and benchmarking.
+                  </div>
+                </div>
+              </div>
               <div className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <Input
@@ -684,10 +712,28 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
       case 'contacts':
         return (
           <div className="space-y-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Info className="h-5 w-5 text-gray-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Optional Information</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Client contacts and brand terms are optional but help with communication and keyword research. 
+                You can add these later or skip this step entirely.
+              </p>
+            </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Client Contacts
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Client Contacts
+                </label>
+                <div className="group relative">
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                  <div className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
+                    Key people to contact at the client's organization. Useful for project communication and reporting.
+                  </div>
+                </div>
+              </div>
               <div className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <Input
@@ -754,13 +800,21 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Brand Terms
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Brand Terms
+                </label>
+                <div className="group relative">
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                  <div className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
+                    Company name variations and branded terms. Helps exclude branded traffic from competitive analysis.
+                  </div>
+                </div>
+              </div>
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
                   <Input
-                    placeholder="Add brand term"
+                    placeholder="e.g., techcorp, tech corp, techcorp australia"
                     value={newBrandTerm.term}
                     onChange={(e) => setNewBrandTerm(prev => ({ ...prev, term: e.target.value }))}
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addBrandTerm())}

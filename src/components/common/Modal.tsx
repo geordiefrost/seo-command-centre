@@ -30,6 +30,8 @@ const Modal: React.FC<ModalProps> = ({
     full: 'max-w-7xl',
   };
   
+  const descriptionId = description ? `modal-description-${Math.random().toString(36).substr(2, 9)}` : undefined;
+  
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -39,6 +41,7 @@ const Modal: React.FC<ModalProps> = ({
             'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-lg animate-in fade-in-0 zoom-in-95',
             sizeClasses[size]
           )}
+          aria-describedby={descriptionId}
         >
           {(title || showCloseButton) && (
             <div className="flex items-center justify-between pb-4">
@@ -57,7 +60,7 @@ const Modal: React.FC<ModalProps> = ({
           )}
           
           {description && (
-            <Dialog.Description className="text-sm text-gray-500 pb-4">
+            <Dialog.Description id={descriptionId} className="text-sm text-gray-500 pb-4">
               {description}
             </Dialog.Description>
           )}

@@ -530,9 +530,28 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => GoogleOAuthService.initiateOAuth()}
+                    onClick={async () => {
+                      try {
+                        await GoogleOAuthService.authenticateWithClientCredentials();
+                        setIsGoogleAuthenticated(true);
+                        // Retry GSC lookup after authentication
+                        if (formData.domain) {
+                          setGscLookupStatus('loading');
+                          const gscProperty = await GoogleOAuthService.findPropertyForDomain(formData.domain);
+                          if (gscProperty) {
+                            updateFormData('searchConsolePropertyId', gscProperty);
+                            setGscLookupStatus('found');
+                          } else {
+                            setGscLookupStatus('not-found');
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Google authentication failed:', error);
+                        setGscLookupStatus('error');
+                      }
+                    }}
                   >
-                    Sign in to Google
+                    Connect to Google
                   </Button>
                 </div>
               )}

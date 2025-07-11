@@ -40,42 +40,50 @@ class GoogleOAuthService {
   }
 
   /**
-   * Initiate Google OAuth flow
+   * Authenticate using client credentials for server-to-server access
    */
-  initiateOAuth(): void {
+  async authenticateWithClientCredentials(): Promise<void> {
     if (this.useMockData) {
-      // In mock mode, simulate successful authentication
       this.handleMockAuth();
       return;
     }
 
-    if (!this.config.clientId) {
-      throw new Error('Google OAuth client ID not configured');
+    if (!this.config.clientId || !this.config.clientSecret) {
+      throw new Error('Google OAuth client ID and secret not configured');
     }
 
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authUrl.searchParams.set('client_id', this.config.clientId);
-    authUrl.searchParams.set('redirect_uri', this.config.redirectUri);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('scope', this.config.scopes.join(' '));
-    authUrl.searchParams.set('access_type', 'offline');
-    authUrl.searchParams.set('prompt', 'consent');
+    try {
+      // For Search Console API, we'll use the client credentials flow
+      // This generates an access token for server-to-server communication
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: this.config.clientId,
+          client_secret: this.config.clientSecret,
+          scope: this.config.scopes.join(' ')
+        })
+      });
 
-    // Open in popup window
-    const popup = window.open(
-      authUrl.toString(),
-      'google-oauth',
-      'width=500,height=600,scrollbars=yes,resizable=yes'
-    );
-
-    // Listen for popup to close
-    const checkClosed = setInterval(() => {
-      if (popup?.closed) {
-        clearInterval(checkClosed);
-        // Refresh the current page or trigger a callback
-        window.location.reload();
+      if (!tokenResponse.ok) {
+        throw new Error(`Token request failed: ${tokenResponse.statusText}`);
       }
-    }, 1000);
+
+      const tokenData = await tokenResponse.json();
+      
+      // Store the access token
+      localStorage.setItem('google_access_token', tokenData.access_token);
+      
+      // Set expiration time
+      const expiresAt = Date.now() + (tokenData.expires_in * 1000);
+      localStorage.setItem('google_token_expires_at', expiresAt.toString());
+    } catch (error) {
+      console.error('Google authentication failed:', error);
+      throw new Error('Failed to authenticate with Google API');
+    }
   }
 
   /**
@@ -124,9 +132,14 @@ class GoogleOAuthService {
       return this.getMockProperties();
     }
 
+    // Ensure we have a valid token
+    if (!this.isAuthenticated()) {
+      await this.authenticateWithClientCredentials();
+    }
+
     const accessToken = this.getStoredAccessToken();
     if (!accessToken) {
-      throw new Error('No access token available. Please authenticate first.');
+      throw new Error('Failed to obtain access token');
     }
 
     const response = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
@@ -138,8 +151,8 @@ class GoogleOAuthService {
 
     if (!response.ok) {
       if (response.status === 401) {
-        // Token expired, try to refresh
-        await this.refreshAccessToken();
+        // Token expired, re-authenticate and retry
+        await this.authenticateWithClientCredentials();
         return this.getSearchConsoleProperties(); // Retry
       }
       throw new Error(`Failed to fetch Search Console properties: ${response.statusText}`);
@@ -191,7 +204,19 @@ class GoogleOAuthService {
     if (this.useMockData) {
       return localStorage.getItem('mock_google_auth') === 'true';
     }
-    return !!this.getStoredAccessToken();
+    
+    const token = this.getStoredAccessToken();
+    if (!token) return false;
+    
+    // Check if token is expired
+    const expiresAt = localStorage.getItem('google_token_expires_at');
+    if (expiresAt && Date.now() > parseInt(expiresAt)) {
+      // Token expired, clear it
+      this.signOut();
+      return false;
+    }
+    
+    return true;
   }
 
   /**
@@ -200,6 +225,7 @@ class GoogleOAuthService {
   signOut(): void {
     localStorage.removeItem('google_access_token');
     localStorage.removeItem('google_refresh_token');
+    localStorage.removeItem('google_token_expires_at');
     localStorage.removeItem('mock_google_auth');
   }
 
@@ -245,10 +271,9 @@ class GoogleOAuthService {
    */
   private handleMockAuth(): void {
     localStorage.setItem('mock_google_auth', 'true');
-    // Simulate popup behavior
-    setTimeout(() => {
-      alert('Mock Google authentication successful!');
-    }, 1000);
+    // Set mock token expiration
+    const expiresAt = Date.now() + (3600 * 1000); // 1 hour
+    localStorage.setItem('google_token_expires_at', expiresAt.toString());
   }
 
   /**

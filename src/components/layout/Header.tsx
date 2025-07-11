@@ -4,6 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useAppStore } from '../../store/appStore';
 import { Button, Input, Badge } from '../common';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -14,9 +15,22 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   
   const unreadNotifications = notifications.filter(n => !n.read).length;
   
-  const handleLogout = () => {
-    setUser(null);
-    setAuthenticated(false);
+  const handleLogout = async () => {
+    try {
+      // Check if Supabase is configured
+      if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        await supabase.auth.signOut();
+      }
+      
+      // Clear local state
+      setUser(null);
+      setAuthenticated(false);
+    } catch (error) {
+      console.error('Error signing out:', error);
+      // Still clear local state even if Supabase logout fails
+      setUser(null);
+      setAuthenticated(false);
+    }
   };
   
   return (

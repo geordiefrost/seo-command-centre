@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Client, Task, TaskFilters, User, UserRole, Notification } from '../types';
+import { ClientService, TaskService } from '../services/database';
 
 interface AppState {
   // User
@@ -42,6 +43,14 @@ interface AppState {
   removeNotification: (id: string) => void;
   markNotificationAsRead: (id: string) => void;
   setLoading: (loading: boolean, message?: string) => void;
+  
+  // Database operations
+  loadClients: () => Promise<void>;
+  loadTasks: () => Promise<void>;
+  createClient: (client: Omit<Client, 'id' | 'createdAt'>) => Promise<void>;
+  createTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateTaskInDB: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -122,4 +131,141 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   setLoading: (loading, message = '') => set({ isLoading: loading, loadingMessage: message }),
+  
+  // Database operations
+  loadClients: async () => {
+    try {
+      set({ isLoading: true, loadingMessage: 'Loading clients...' });
+      const clients = await ClientService.getClients();
+      set({ clients });
+    } catch (error) {
+      console.error('Failed to load clients:', error);
+      get().addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load clients',
+        timestamp: new Date(),
+        read: false,
+      });
+    } finally {
+      set({ isLoading: false, loadingMessage: '' });
+    }
+  },
+  
+  loadTasks: async () => {
+    try {
+      set({ isLoading: true, loadingMessage: 'Loading tasks...' });
+      const tasks = await TaskService.getTasks();
+      set({ tasks });
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
+      get().addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load tasks',
+        timestamp: new Date(),
+        read: false,
+      });
+    } finally {
+      set({ isLoading: false, loadingMessage: '' });
+    }
+  },
+  
+  createClient: async (clientData) => {
+    try {
+      set({ isLoading: true, loadingMessage: 'Creating client...' });
+      const newClient = await ClientService.createClient(clientData);
+      const { clients } = get();
+      set({ clients: [...clients, newClient] });
+      get().addNotification({
+        type: 'success',
+        title: 'Success',
+        message: 'Client created successfully',
+        timestamp: new Date(),
+        read: false,
+      });
+    } catch (error) {
+      console.error('Failed to create client:', error);
+      get().addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to create client',
+        timestamp: new Date(),
+        read: false,
+      });
+    } finally {
+      set({ isLoading: false, loadingMessage: '' });
+    }
+  },
+  
+  createTask: async (taskData) => {
+    try {
+      set({ isLoading: true, loadingMessage: 'Creating task...' });
+      const newTask = await TaskService.createTask(taskData);
+      const { tasks } = get();
+      set({ tasks: [newTask, ...tasks] });
+      get().addNotification({
+        type: 'success',
+        title: 'Success',
+        message: 'Task created successfully',
+        timestamp: new Date(),
+        read: false,
+      });
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      get().addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to create task',
+        timestamp: new Date(),
+        read: false,
+      });
+    } finally {
+      set({ isLoading: false, loadingMessage: '' });
+    }
+  },
+  
+  updateTaskInDB: async (taskId, updates) => {
+    try {
+      const updatedTask = await TaskService.updateTask(taskId, updates);
+      const { tasks } = get();
+      const updatedTasks = tasks.map(task =>
+        task.id === taskId ? updatedTask : task
+      );
+      set({ tasks: updatedTasks });
+    } catch (error) {
+      console.error('Failed to update task:', error);
+      get().addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to update task',
+        timestamp: new Date(),
+        read: false,
+      });
+    }
+  },
+  
+  deleteTask: async (taskId) => {
+    try {
+      await TaskService.deleteTask(taskId);
+      const { tasks } = get();
+      set({ tasks: tasks.filter(task => task.id !== taskId) });
+      get().addNotification({
+        type: 'success',
+        title: 'Success',
+        message: 'Task deleted successfully',
+        timestamp: new Date(),
+        read: false,
+      });
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      get().addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to delete task',
+        timestamp: new Date(),
+        read: false,
+      });
+    }
+  },
 }));

@@ -4,6 +4,7 @@ import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { Button, Input, Card } from '../components/common';
 import { UserRole } from '../types';
+import { supabase } from '../lib/supabase';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -23,31 +24,77 @@ const Login: React.FC = () => {
     setError('');
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock authentication - accept any email/password
-      const mockUser = {
-        id: 'user-1',
-        email: formData.email,
-        name: formData.email.includes('admin') ? 'Admin User' : 'SEO Specialist',
-        role: formData.email.includes('admin') ? UserRole.ADMIN : UserRole.EXECUTIVE,
-        avatar: undefined,
-        preferences: {
-          theme: 'light' as const,
-          notifications: {
-            email: true,
-            slack: true,
-            browser: true,
+      // Check if Supabase is configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        // Fallback to mock authentication
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const mockUser = {
+          id: 'user-1',
+          email: formData.email,
+          name: formData.email.includes('admin') ? 'Admin User' : 'SEO Specialist',
+          role: formData.email.includes('admin') ? UserRole.ADMIN : UserRole.EXECUTIVE,
+          avatar: undefined,
+          preferences: {
+            theme: 'light' as const,
+            notifications: {
+              email: true,
+              slack: true,
+              browser: true,
+            },
           },
-        },
-      };
+        };
+        
+        setUser(mockUser);
+        setAuthenticated(true);
+        navigate('/');
+        return;
+      }
       
-      setUser(mockUser);
-      setAuthenticated(true);
+      // Real Supabase authentication
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+      
+      if (error) {
+        // If user doesn't exist, try to sign them up
+        if (error.message.includes('Invalid login credentials')) {
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: formData.email,
+            password: formData.password,
+          });
+          
+          if (signUpError) {
+            throw signUpError;
+          }
+          
+          if (signUpData.user) {
+            // Create user profile
+            const { error: profileError } = await supabase
+              .from('users')
+              .insert([
+                {
+                  id: signUpData.user.id,
+                  email: signUpData.user.email!,
+                  name: formData.email.includes('admin') ? 'Admin User' : 'SEO Specialist',
+                  role: formData.email.includes('admin') ? 'admin' : 'executive',
+                }
+              ]);
+            
+            if (profileError) {
+              console.error('Error creating user profile:', profileError);
+            }
+          }
+        } else {
+          throw error;
+        }
+      }
+      
+      // Authentication successful - App.tsx will handle the auth state change
       navigate('/');
-    } catch (err) {
-      setError('Login failed. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -117,9 +164,18 @@ const Login: React.FC = () => {
         
         <div className="mt-6 text-center">
           <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
-            <strong>Demo Credentials:</strong><br />
-            Email: admin@bangdigital.com.au<br />
-            Password: password123
+            <strong>Demo:</strong><br />
+            {import.meta.env.VITE_SUPABASE_URL ? (
+              <>
+                Create account or sign in with any email/password<br />
+                Email: admin@bangdigital.com.au for admin role
+              </>
+            ) : (
+              <>
+                Email: admin@bangdigital.com.au<br />
+                Password: password123
+              </>
+            )}
           </div>
         </div>
         

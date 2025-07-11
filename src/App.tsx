@@ -6,7 +6,8 @@ import { useToolStore } from './store/toolStore';
 import { useIntegrationStore } from './store/integrationStore';
 import { Layout } from './components/layout';
 import { Dashboard, Login, Strategy, Content, Monitoring, Migration, Competitive, Automation } from './pages';
-import { mockClients, mockTasks, mockTools, mockIntegrationData } from './mock';
+import { mockTools, mockIntegrationData } from './mock';
+import { supabase } from './lib/supabase';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,14 +19,17 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const { isAuthenticated, setClients, setTasks } = useAppStore();
+  const { isAuthenticated, loadClients, loadTasks, setAuthenticated, setUser } = useAppStore();
   const { setTools } = useToolStore();
   const { setIntegrations, setIntegrationStatus } = useIntegrationStore();
   
-  // Initialize stores with mock data
+  // Initialize stores with data (DB for clients/tasks, mock for tools)
   useEffect(() => {
-    setClients(mockClients);
-    setTasks(mockTasks);
+    // Load real data from database
+    loadClients();
+    loadTasks();
+    
+    // Load mock data for tools
     setTools(mockTools);
     
     // Initialize integrations
@@ -51,7 +55,28 @@ function App() {
         usage: (status as any).usage,
       });
     });
-  }, [setClients, setTasks, setTools, setIntegrations, setIntegrationStatus]);
+    
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        // User is logged in, set authenticated state
+        setAuthenticated(true);
+        // In a real app, you would fetch user data here
+      }
+    });
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setAuthenticated(true);
+      } else {
+        setAuthenticated(false);
+        setUser(null);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [loadClients, loadTasks, setTools, setIntegrations, setIntegrationStatus, setAuthenticated, setUser]);
   
   return (
     <QueryClientProvider client={queryClient}>

@@ -22,7 +22,7 @@ import {
 import { Card, Button, Input, Select } from '../common';
 import { useAppStore } from '../../store/appStore';
 import { supabase } from '../../lib/supabase';
-import FirecrawlService, { QuickCrawlInsights } from '../../services/integrations/FirecrawlService';
+import FirecrawlService, { QuickCrawlInsights } from '../../services/integrations/FirecrawlService';\nimport GoogleOAuthService from '../../services/integrations/GoogleOAuthService';
 import { Client, ClientContact, ClientCompetitor, ClientBrandTerm } from '../../types';
 
 interface OnboardingStep {
@@ -42,20 +42,20 @@ const STEPS: OnboardingStep[] = [
   {
     id: 'website',
     title: 'Website Analysis',
-    description: 'Website URL and instant SEO insights',
+    description: 'Website URL and 20-page SEO analysis',
     icon: Globe
   },
   {
     id: 'market',
-    title: 'Target Audience',
-    description: 'Geographic markets and key competitors',
+    title: 'Audience and Competitors',
+    description: 'Target markets and competitor analysis',
     icon: Target
   },
   {
-    id: 'contacts',
-    title: 'Contacts & Brand (Optional)',
-    description: 'Key contacts and brand terms',
-    icon: Users
+    id: 'brand',
+    title: 'Brand Terms (Optional)',
+    description: 'Brand terms for keyword research',
+    icon: Search
   },
   {
     id: 'complete',
@@ -81,6 +81,9 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [crawlInsights, setCrawlInsights] = useState<QuickCrawlInsights | null>(null);
   const [isCrawling, setIsCrawling] = useState(false);
+  const [isGoogleAuthenticated, setIsGoogleAuthenticated] = useState(GoogleOAuthService.isAuthenticated());
+  const [availableGSCProperties, setAvailableGSCProperties] = useState<Array<{value: string, label: string}>>([]);
+  const [isLoadingGSCProperties, setIsLoadingGSCProperties] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -98,12 +101,6 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
     notes: initialData?.notes || '',
     
     // Additional data
-    contacts: [] as Array<{
-      name: string;
-      email: string;
-      role: string;
-      isPrimary: boolean;
-    }>,
     competitors: [] as Array<{
       domain: string;
       name: string;
@@ -115,12 +112,7 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
     }>
   });
 
-  const [newContact, setNewContact] = useState({
-    name: '',
-    email: '',
-    role: '',
-    isPrimary: false
-  });
+  // Removed contact management
 
   const [newCompetitor, setNewCompetitor] = useState({
     domain: '',
@@ -271,20 +263,7 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
         clientId = clientData.id;
       }
 
-      // Insert contacts
-      if (formData.contacts.length > 0) {
-        const { error: contactsError } = await supabase
-          .from('client_contacts')
-          .insert(formData.contacts.map(contact => ({
-            client_id: clientId,
-            name: contact.name,
-            email: contact.email,
-            role: contact.role || null,
-            is_primary: contact.isPrimary
-          })));
-
-        if (contactsError) throw contactsError;
-      }
+      // Removed contact insertion - contacts no longer collected
 
       // Insert competitors
       if (formData.competitors.length > 0) {
@@ -524,9 +503,9 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
                     icon={isCrawling ? Loader2 : Bot}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    {isCrawling ? 'Analyzing Homepage...' : 'Analyze Homepage'}
+                    {isCrawling ? 'Analyzing Website (20 pages)...' : 'Analyze Website (20 pages)'}
                   </Button>
-                  <span className="text-xs text-blue-600">Takes 5-10 seconds</span>
+                  <span className="text-xs text-blue-600">Takes 30-60 seconds</span>
                 </div>
 
                 {crawlInsights && (
@@ -709,96 +688,20 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
           </div>
         );
 
-      case 'contacts':
+      case 'brand':
         return (
           <div className="space-y-6">
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
               <div className="flex items-center gap-2 mb-2">
                 <Info className="h-5 w-5 text-gray-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Optional Information</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Optional: Brand Terms</h3>
               </div>
               <p className="text-sm text-gray-600">
-                Client contacts and brand terms are optional but help with communication and keyword research. 
-                You can add these later or skip this step entirely.
+                Brand terms help us exclude branded traffic from competitive analysis and identify opportunities 
+                for non-branded keyword research. You can add these later or skip this step entirely.
               </p>
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Client Contacts
-                </label>
-                <div className="group relative">
-                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
-                  <div className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
-                    Key people to contact at the client's organization. Useful for project communication and reporting.
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                  <Input
-                    placeholder="Contact name"
-                    value={newContact.name}
-                    onChange={(e) => setNewContact(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Email address"
-                    value={newContact.email}
-                    onChange={(e) => setNewContact(prev => ({ ...prev, email: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Role (optional)"
-                    value={newContact.role}
-                    onChange={(e) => setNewContact(prev => ({ ...prev, role: e.target.value }))}
-                  />
-                  <div className="flex items-center space-x-2">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={newContact.isPrimary}
-                        onChange={(e) => setNewContact(prev => ({ ...prev, isPrimary: e.target.checked }))}
-                        className="mr-1"
-                      />
-                      <span className="text-sm">Primary</span>
-                    </label>
-                    <Button
-                      type="button"
-                      onClick={addContact}
-                      size="sm"
-                      icon={Plus}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </div>
-                {formData.contacts.length > 0 && (
-                  <div className="space-y-2">
-                    {formData.contacts.map((contact, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <span className="font-medium">{contact.name}</span>
-                          <span className="text-sm text-gray-500 ml-2">{contact.email}</span>
-                          {contact.role && <span className="text-sm text-gray-500 ml-2">({contact.role})</span>}
-                          {contact.isPrimary && (
-                            <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                              Primary
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeContact(index)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
+            
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <label className="block text-sm font-medium text-gray-700">

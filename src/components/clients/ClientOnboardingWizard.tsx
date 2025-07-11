@@ -86,6 +86,8 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
   const [availableGSCProperties, setAvailableGSCProperties] = useState<Array<{value: string, label: string}>>([]);
   const [isLoadingGSCProperties, setIsLoadingGSCProperties] = useState(false);
   const [gscLookupStatus, setGscLookupStatus] = useState<'none' | 'loading' | 'found' | 'not-found' | 'error'>('none');
+  const [crawlError, setCrawlError] = useState<string | null>(null);
+  const [gscError, setGscError] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -142,30 +144,41 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
     }
   };
 
-  const handleWebsiteChange = async (url: string) => {
+  const handleWebsiteChange = (url: string) => {
     updateFormData('websiteUrl', url);
     if (url) {
       const domain = extractDomainFromUrl(url);
       updateFormData('domain', domain);
-      
-      // Auto-lookup Google Search Console property if authenticated
-      if (isGoogleAuthenticated) {
-        setGscLookupStatus('loading');
-        try {
-          const gscProperty = await GoogleOAuthService.findPropertyForDomain(domain);
-          if (gscProperty) {
-            updateFormData('searchConsolePropertyId', gscProperty);
-            setGscLookupStatus('found');
-          } else {
-            setGscLookupStatus('not-found');
-          }
-        } catch (error) {
-          console.error('GSC property lookup failed:', error);
-          setGscLookupStatus('error');
-        }
-      }
-    } else {
+      // Reset GSC lookup status when URL changes
       setGscLookupStatus('none');
+      setGscError(null);
+    }
+  };
+
+  const handleGSCLookup = async () => {
+    if (!formData.domain) return;
+    
+    setGscLookupStatus('loading');
+    setGscError(null);
+    
+    try {
+      if (!isGoogleAuthenticated) {
+        await GoogleOAuthService.initiateOAuth();
+        setIsGoogleAuthenticated(true);
+      }
+      
+      const gscProperty = await GoogleOAuthService.findPropertyForDomain(formData.domain);
+      if (gscProperty) {
+        updateFormData('searchConsolePropertyId', gscProperty);
+        setGscLookupStatus('found');
+      } else {
+        setGscLookupStatus('not-found');
+      }
+    } catch (error) {
+      console.error('GSC property lookup failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setGscError(errorMessage);
+      setGscLookupStatus('error');
     }
   };
 
@@ -173,15 +186,27 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
     if (!formData.websiteUrl) return;
 
     setIsCrawling(true);
+    setCrawlError(null);
+    setCrawlInsights(null);
+    
     try {
+      console.log('Starting website crawl:', formData.websiteUrl);
+      
       // Use fullCrawl with 20 page limit instead of quickCrawl (1 page)
       const results = await FirecrawlService.fullCrawl(formData.websiteUrl, { maxPages: 20 });
       
       // Convert full crawl results to insights format
       const insights = FirecrawlService.convertCrawlToInsights(results);
       setCrawlInsights(insights);
+      
+      console.log('Website crawl completed successfully:', {
+        pagesAnalyzed: insights.pagesAnalyzed,
+        seoScore: insights.seoScore
+      });
     } catch (error) {
       console.error('Website crawl failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setCrawlError(errorMessage);
     } finally {
       setIsCrawling(false);
     }
@@ -532,7 +557,7 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
                     variant="outline"
                     onClick={async () => {
                       try {
-                        await GoogleOAuthService.authenticateWithClientCredentials();
+                        await GoogleOAuthService.initiateOAuth();
                         setIsGoogleAuthenticated(true);
                         // Retry GSC lookup after authentication
                         if (formData.domain) {

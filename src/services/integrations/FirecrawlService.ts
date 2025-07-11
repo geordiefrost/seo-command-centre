@@ -82,37 +82,65 @@ class FirecrawlService {
     excludePaths?: string[]; 
     includePaths?: string[] 
   } = {}): Promise<FirecrawlResult[]> {
-    try {
-      // Check if API is configured, fallback to mock data if not
-      if (!this.apiKey) {
-        console.warn('Firecrawl API key not configured, using mock data');
-        return this.getMockFullCrawlResults(baseUrl, options.maxPages || 20);
-      }
+    console.log('Starting full crawl:', {
+      baseUrl,
+      options,
+      hasApiKey: !!this.apiKey,
+      useMockData: this.useMockData
+    });
 
+    // Validate URL format
+    try {
+      new URL(baseUrl);
+    } catch (error) {
+      const errorMsg = `Invalid URL format: ${baseUrl}`;
+      console.error(errorMsg, error);
+      throw new Error(errorMsg);
+    }
+
+    // Check if API is configured
+    if (!this.apiKey) {
+      const error = 'Firecrawl API key not configured. Please set VITE_FIRECRAWL_API_KEY environment variable.';
+      console.error(error);
+      throw new Error(error);
+    }
+
+    if (this.useMockData) {
+      console.log('Using mock data for development');
+      return this.getMockFullCrawlResults(baseUrl, options.maxPages || 20);
+    }
+
+    try {
+      console.log('Initiating crawl with Firecrawl API...');
+      
       const crawlId = await this.initiateCrawl(baseUrl, {
         limit: options.maxPages || 50,
         excludePaths: options.excludePaths || [],
         includePaths: options.includePaths || []
       });
 
-      return await this.waitForCrawlCompletion(crawlId);
-    } catch (error) {
-      console.error('Full crawl failed:', error);
+      console.log('Crawl initiated, waiting for completion:', crawlId);
       
-      // Always fallback to mock data on any error
+      const results = await this.waitForCrawlCompletion(crawlId);
+      
+      console.log('Crawl completed successfully:', {
+        crawlId,
+        pagesFound: results.length
+      });
+      
+      return results;
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      if (errorMessage.includes('401') || 
-          errorMessage.includes('Unauthorized') || 
-          errorMessage.includes('undefined') ||
-          !errorMessage) {
-        console.warn('Firecrawl API error, using mock data:', errorMessage);
-        return this.getMockFullCrawlResults(baseUrl, options.maxPages || 20);
-      }
+      console.error('Firecrawl API Error:', {
+        error: errorMessage,
+        baseUrl,
+        options,
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
-      // For other errors, still provide mock data as fallback
-      console.warn('Firecrawl API error, falling back to mock data');
-      return this.getMockFullCrawlResults(baseUrl, options.maxPages || 20);
+      // Don't fallback to mock data - throw the actual error
+      throw new Error(`Firecrawl API failed: ${errorMessage}`);
     }
   }
 
@@ -626,11 +654,25 @@ class FirecrawlService {
   }
 
   /**
-   * Generate mock full crawl results for testing
+   * Generate mock full crawl results for testing (only used in development)
    */
   private getMockFullCrawlResults(baseUrl: string, maxPages: number): FirecrawlResult[] {
     const results: FirecrawlResult[] = [];
-    const domain = new URL(baseUrl).hostname;
+    
+    // Validate URL before processing
+    let domain: string;
+    try {
+      domain = new URL(baseUrl).hostname;
+    } catch (error) {
+      console.error('Invalid URL in mock data generator:', baseUrl);
+      throw new Error(`Invalid URL format: ${baseUrl}`);
+    }
+    
+    console.log('Generating mock crawl results:', {
+      baseUrl,
+      domain,
+      maxPages
+    });
     
     for (let i = 0; i < Math.min(maxPages, 20); i++) {
       const pageUrl = i === 0 ? baseUrl : `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}page-${i}`;
@@ -669,6 +711,7 @@ Get in touch with us today to learn more about how we can help you achieve your 
       });
     }
     
+    console.log('Generated mock crawl results:', results.length, 'pages');
     return results;
   }
 }

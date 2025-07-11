@@ -40,49 +40,74 @@ class GoogleOAuthService {
   }
 
   /**
-   * Authenticate using client credentials for server-to-server access
+   * Initiate Google OAuth authorization flow
    */
-  async authenticateWithClientCredentials(): Promise<void> {
+  async initiateOAuth(): Promise<void> {
     if (this.useMockData) {
       this.handleMockAuth();
       return;
     }
 
-    if (!this.config.clientId || !this.config.clientSecret) {
-      throw new Error('Google OAuth client ID and secret not configured');
+    if (!this.config.clientId) {
+      const error = 'Google OAuth client ID not configured. Please set VITE_GOOGLE_CLIENT_ID environment variable.';
+      console.error(error);
+      throw new Error(error);
     }
 
     try {
-      // For Search Console API, we'll use the client credentials flow
-      // This generates an access token for server-to-server communication
-      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'client_credentials',
-          client_id: this.config.clientId,
-          client_secret: this.config.clientSecret,
-          scope: this.config.scopes.join(' ')
-        })
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.set('client_id', this.config.clientId);
+      authUrl.searchParams.set('redirect_uri', this.config.redirectUri);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('scope', this.config.scopes.join(' '));
+      authUrl.searchParams.set('access_type', 'offline');
+      authUrl.searchParams.set('prompt', 'consent');
+      authUrl.searchParams.set('state', 'search-console-auth');
+
+      console.log('Initiating Google OAuth flow:', {
+        clientId: this.config.clientId,
+        redirectUri: this.config.redirectUri,
+        scopes: this.config.scopes
       });
 
-      if (!tokenResponse.ok) {
-        throw new Error(`Token request failed: ${tokenResponse.statusText}`);
+      // Open OAuth flow in new window
+      const authWindow = window.open(
+        authUrl.toString(),
+        'google-oauth',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+
+      if (!authWindow) {
+        throw new Error('Failed to open OAuth popup. Please check popup blockers.');
       }
 
-      const tokenData = await tokenResponse.json();
-      
-      // Store the access token
-      localStorage.setItem('google_access_token', tokenData.access_token);
-      
-      // Set expiration time
-      const expiresAt = Date.now() + (tokenData.expires_in * 1000);
-      localStorage.setItem('google_token_expires_at', expiresAt.toString());
+      // Wait for OAuth completion
+      return new Promise((resolve, reject) => {
+        const checkClosed = setInterval(() => {
+          if (authWindow.closed) {
+            clearInterval(checkClosed);
+            // Check if authentication was successful
+            if (this.isAuthenticated()) {
+              console.log('Google OAuth completed successfully');
+              resolve();
+            } else {
+              reject(new Error('OAuth flow was cancelled or failed'));
+            }
+          }
+        }, 1000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          clearInterval(checkClosed);
+          if (!authWindow.closed) {
+            authWindow.close();
+          }
+          reject(new Error('OAuth flow timed out'));
+        }, 300000);
+      });
     } catch (error) {
-      console.error('Google authentication failed:', error);
-      throw new Error('Failed to authenticate with Google API');
+      console.error('Google OAuth initiation failed:', error);
+      throw error;
     }
   }
 
@@ -132,34 +157,48 @@ class GoogleOAuthService {
       return this.getMockProperties();
     }
 
-    // Ensure we have a valid token
-    if (!this.isAuthenticated()) {
-      await this.authenticateWithClientCredentials();
-    }
-
     const accessToken = this.getStoredAccessToken();
     if (!accessToken) {
-      throw new Error('Failed to obtain access token');
+      const error = 'No access token available. Please authenticate with Google first.';
+      console.error(error);
+      throw new Error(error);
     }
 
-    const response = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    try {
+      console.log('Fetching Google Search Console properties...');
+      
+      const response = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        // Token expired, re-authenticate and retry
-        await this.authenticateWithClientCredentials();
-        return this.getSearchConsoleProperties(); // Retry
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('GSC API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        
+        if (response.status === 401) {
+          // Token expired, clear it
+          this.signOut();
+          throw new Error('Access token expired. Please re-authenticate with Google.');
+        }
+        
+        throw new Error(`GSC API Error (${response.status}): ${response.statusText}. ${errorText}`);
       }
-      throw new Error(`Failed to fetch Search Console properties: ${response.statusText}`);
-    }
 
-    const data = await response.json();
-    return data.siteEntry || [];
+      const data = await response.json();
+      console.log('GSC Properties Response:', data);
+      
+      return data.siteEntry || [];
+    } catch (error) {
+      console.error('Error fetching GSC properties:', error);
+      throw error;
+    }
   }
 
   /**

@@ -8,6 +8,7 @@ import { Layout } from './components/layout';
 import { Dashboard, Login, Strategy, Content, Monitoring, Migration, Competitive, Automation } from './pages';
 import { mockTools, mockIntegrationData } from './mock';
 import { supabase } from './lib/supabase';
+// import { quickDatabaseTest } from './utils/quickTest';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +78,16 @@ function App() {
     
     return () => subscription.unsubscribe();
   }, [loadClients, loadTasks, setTools, setIntegrations, setIntegrationStatus, setAuthenticated, setUser]);
+  
+  // Test database connection (only in development)
+  // useEffect(() => {
+  //   if (import.meta.env.DEV && import.meta.env.VITE_SUPABASE_URL) {
+  //     // Run tests after a short delay to let the app initialize
+  //     setTimeout(() => {
+  //       quickDatabaseTest();
+  //     }, 2000);
+  //   }
+  // }, []);
   
   return (
     <QueryClientProvider client={queryClient}>

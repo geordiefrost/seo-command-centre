@@ -119,18 +119,39 @@ export interface KeywordData {
   difficulty: number;
   cpc: number;
   trend: number[];
-  competition: 'low' | 'medium' | 'high';
+  competition: number;
   intent: 'informational' | 'navigational' | 'transactional' | 'commercial';
+  relatedKeywords: string[];
 }
 
 export interface SERPAnalysis {
   keyword: string;
+  totalResults: number;
+  organicResults: OrganicResult[];
+  featuredSnippets: FeaturedSnippet[];
+  relatedQuestions: RelatedQuestion[];
+  searchVolume: number;
+  difficulty: number;
+}
+
+export interface OrganicResult {
   position: number;
-  url: string;
   title: string;
+  url: string;
   description: string;
-  features: string[];
-  competitors: CompetitorRanking[];
+  domain: string;
+}
+
+export interface FeaturedSnippet {
+  type: string;
+  title: string;
+  content: string;
+  url: string;
+}
+
+export interface RelatedQuestion {
+  question: string;
+  answer: string;
 }
 
 export interface CompetitorRanking {

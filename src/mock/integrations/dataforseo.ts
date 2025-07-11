@@ -1,4 +1,4 @@
-import { KeywordData, SERPAnalysis, CompetitorRanking } from '../../types';
+import { KeywordData, SERPAnalysis } from '../../types';
 
 export const mockKeywordData: KeywordData[] = [
   {
@@ -7,8 +7,9 @@ export const mockKeywordData: KeywordData[] = [
     difficulty: 45,
     cpc: 3.50,
     trend: [100, 95, 110, 120, 115, 130, 125, 140, 135, 150, 145, 160],
-    competition: 'medium',
+    competition: 0.5,
     intent: 'commercial',
+    relatedKeywords: ['seo tools', 'search engine optimization', 'seo software'],
   },
   {
     keyword: 'seo tools',
@@ -16,8 +17,9 @@ export const mockKeywordData: KeywordData[] = [
     difficulty: 65,
     cpc: 4.25,
     trend: [100, 105, 115, 110, 120, 125, 130, 135, 140, 145, 150, 155],
-    competition: 'high',
+    competition: 0.8,
     intent: 'commercial',
+    relatedKeywords: ['seo software', 'seo platforms', 'search optimization'],
   },
   {
     keyword: 'technical seo audit',
@@ -25,8 +27,9 @@ export const mockKeywordData: KeywordData[] = [
     difficulty: 55,
     cpc: 5.80,
     trend: [100, 90, 85, 95, 100, 105, 110, 115, 120, 125, 130, 135],
-    competition: 'medium',
+    competition: 0.6,
     intent: 'commercial',
+    relatedKeywords: ['technical seo', 'seo audit tools', 'website audit'],
   },
   {
     keyword: 'content optimization',
@@ -34,8 +37,9 @@ export const mockKeywordData: KeywordData[] = [
     difficulty: 42,
     cpc: 3.20,
     trend: [100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122],
-    competition: 'medium',
+    competition: 0.4,
     intent: 'informational',
+    relatedKeywords: ['content seo', 'seo content', 'content marketing'],
   },
   {
     keyword: 'website migration seo',
@@ -43,8 +47,9 @@ export const mockKeywordData: KeywordData[] = [
     difficulty: 38,
     cpc: 6.50,
     trend: [100, 98, 96, 94, 92, 90, 95, 100, 105, 110, 115, 120],
-    competition: 'low',
+    competition: 0.3,
     intent: 'commercial',
+    relatedKeywords: ['website migration', 'seo migration', 'site migration'],
   },
   {
     keyword: 'competitor analysis seo',
@@ -52,57 +57,79 @@ export const mockKeywordData: KeywordData[] = [
     difficulty: 48,
     cpc: 4.10,
     trend: [100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155],
-    competition: 'medium',
+    competition: 0.5,
     intent: 'commercial',
+    relatedKeywords: ['competitor research', 'seo competitors', 'market analysis'],
   },
 ];
 
 export const mockSERPAnalysis: SERPAnalysis[] = [
   {
     keyword: 'seo tools',
-    position: 12,
-    url: 'https://techcorp.com.au/seo-tools',
-    title: 'Best SEO Tools for Australian Businesses | TechCorp',
-    description: 'Discover the most effective SEO tools used by Australian businesses to improve their search rankings and drive more organic traffic.',
-    features: ['featured_snippet', 'people_also_ask', 'related_searches'],
-    competitors: [
+    totalResults: 125000000,
+    organicResults: [
       {
-        domain: 'ahrefs.com',
         position: 1,
-        url: 'https://ahrefs.com/seo-tools',
         title: 'Free SEO Tools | Ahrefs',
+        url: 'https://ahrefs.com/seo-tools',
         description: 'Use Ahrefs\' SEO tools to optimize your website for search engines and get more traffic from Google.',
+        domain: 'ahrefs.com',
       },
       {
-        domain: 'semrush.com',
         position: 2,
-        url: 'https://semrush.com/tools/',
         title: 'SEO Tools | Semrush',
+        url: 'https://semrush.com/tools/',
         description: 'Semrush\'s SEO tools help you research keywords, track rankings, and analyze your competition.',
+        domain: 'semrush.com',
+      },
+      {
+        position: 3,
+        title: 'Best SEO Tools for Australian Businesses | TechCorp',
+        url: 'https://techcorp.com.au/seo-tools',
+        description: 'Discover the most effective SEO tools used by Australian businesses to improve their search rankings and drive more organic traffic.',
+        domain: 'techcorp.com.au',
       },
     ],
+    featuredSnippets: [
+      {
+        type: 'paragraph',
+        title: 'What are the best SEO tools?',
+        content: 'The best SEO tools include Ahrefs, SEMrush, Moz, and Google Search Console. These tools help with keyword research, competitor analysis, and technical SEO audits.',
+        url: 'https://example.com/best-seo-tools',
+      },
+    ],
+    relatedQuestions: [
+      {
+        question: 'What are the best free SEO tools?',
+        answer: 'Google Search Console, Google Analytics, and Bing Webmaster Tools are excellent free SEO tools.',
+      },
+      {
+        question: 'How do SEO tools work?',
+        answer: 'SEO tools analyze websites, track rankings, research keywords, and provide insights to improve search engine visibility.',
+      },
+    ],
+    searchVolume: 8900,
+    difficulty: 65,
   },
 ];
 
 export const mockCompetitorData = {
   rankings: [
     {
-      domain: 'competitor1.com',
       keyword: 'seo tools',
       position: 3,
-      previousPosition: 5,
-      change: 2,
       url: 'https://competitor1.com/seo-tools',
+      title: 'Complete SEO Tools Guide | Competitor1',
       traffic: 2500,
+      volume: 8900,
     },
     {
-      domain: 'competitor2.com',
       keyword: 'seo automation',
       position: 7,
-      previousPosition: 8,
-      change: 1,
       url: 'https://competitor2.com/automation',
+      title: 'SEO Automation Solutions | Competitor2',
       traffic: 1200,
+      volume: 1200,
     },
   ],
   backlinks: [

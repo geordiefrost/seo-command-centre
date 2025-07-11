@@ -519,67 +519,55 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Google Search Console Property ID
               </label>
-              <Input
-                placeholder="Optional - we can help you find this"
-                value={formData.searchConsolePropertyId}
-                onChange={(e) => updateFormData('searchConsolePropertyId', e.target.value)}
-              />
-              {gscLookupStatus === 'loading' && (
-                <div className="flex items-center gap-2 mt-2 text-sm text-blue-600">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Looking up Google Search Console property...
-                </div>
-              )}
-              {gscLookupStatus === 'found' && (
-                <div className="flex items-center gap-2 mt-2 text-sm text-green-600">
-                  <CheckCircle className="h-4 w-4" />
-                  Found and auto-filled Search Console property!
-                </div>
-              )}
-              {gscLookupStatus === 'not-found' && (
-                <div className="flex items-center gap-2 mt-2 text-sm text-orange-600">
-                  <AlertCircle className="h-4 w-4" />
-                  No Search Console property found for this domain
-                </div>
-              )}
-              {gscLookupStatus === 'error' && (
-                <div className="flex items-center gap-2 mt-2 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4" />
-                  Error looking up Search Console property
-                </div>
-              )}
-              {!isGoogleAuthenticated && formData.domain && (
-                <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
-                  <Info className="h-4 w-4" />
-                  <span>Sign in to Google to auto-lookup Search Console properties</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        await GoogleOAuthService.initiateOAuth();
-                        setIsGoogleAuthenticated(true);
-                        // Retry GSC lookup after authentication
-                        if (formData.domain) {
-                          setGscLookupStatus('loading');
-                          const gscProperty = await GoogleOAuthService.findPropertyForDomain(formData.domain);
-                          if (gscProperty) {
-                            updateFormData('searchConsolePropertyId', gscProperty);
-                            setGscLookupStatus('found');
-                          } else {
-                            setGscLookupStatus('not-found');
-                          }
-                        }
-                      } catch (error) {
-                        console.error('Google authentication failed:', error);
-                        setGscLookupStatus('error');
-                      }
-                    }}
-                  >
-                    Connect to Google
-                  </Button>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Input
+                  placeholder="Optional - use lookup button to find automatically"
+                  value={formData.searchConsolePropertyId}
+                  onChange={(e) => updateFormData('searchConsolePropertyId', e.target.value)}
+                />
+                
+                {formData.domain && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGSCLookup}
+                      disabled={gscLookupStatus === 'loading'}
+                      icon={gscLookupStatus === 'loading' ? Loader2 : Search}
+                    >
+                      {gscLookupStatus === 'loading' ? 'Looking up...' : 'Lookup GSC Property'}
+                    </Button>
+                    
+                    {gscLookupStatus === 'found' && (
+                      <div className="flex items-center gap-1 text-sm text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        Found and filled!
+                      </div>
+                    )}
+                    
+                    {gscLookupStatus === 'not-found' && (
+                      <div className="flex items-center gap-1 text-sm text-orange-600">
+                        <AlertCircle className="h-4 w-4" />
+                        No GSC property found
+                      </div>
+                    )}
+                    
+                    {gscLookupStatus === 'error' && (
+                      <div className="flex items-center gap-1 text-sm text-red-600">
+                        <AlertCircle className="h-4 w-4" />
+                        Lookup failed
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {gscError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <div className="font-medium mb-1">GSC Lookup Error:</div>
+                    <div className="text-xs font-mono">{gscError}</div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {formData.websiteUrl && (

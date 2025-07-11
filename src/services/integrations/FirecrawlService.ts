@@ -89,13 +89,27 @@ class FirecrawlService {
       useMockData: this.useMockData
     });
 
-    // Validate URL format
+    // Validate and normalize URL format
+    let normalizedUrl = baseUrl;
     try {
       new URL(baseUrl);
     } catch (error) {
-      const errorMsg = `Invalid URL format: ${baseUrl}`;
-      console.error(errorMsg, error);
-      throw new Error(errorMsg);
+      // Try adding https:// if no protocol is present
+      if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+        normalizedUrl = `https://${baseUrl}`;
+        console.log('Adding https:// to URL:', normalizedUrl);
+        try {
+          new URL(normalizedUrl);
+        } catch (secondError) {
+          const errorMsg = `Invalid URL format: ${baseUrl}. Please enter a valid URL with protocol (e.g., https://example.com)`;
+          console.error(errorMsg, secondError);
+          throw new Error(errorMsg);
+        }
+      } else {
+        const errorMsg = `Invalid URL format: ${baseUrl}`;
+        console.error(errorMsg, error);
+        throw new Error(errorMsg);
+      }
     }
 
     // Check if API is configured
@@ -113,13 +127,16 @@ class FirecrawlService {
     try {
       console.log('Initiating crawl with Firecrawl API...');
       
-      const crawlId = await this.initiateCrawl(baseUrl, {
+      const crawlId = await this.initiateCrawl(normalizedUrl, {
         limit: options.maxPages || 50,
         excludePaths: options.excludePaths || [],
         includePaths: options.includePaths || []
       });
 
-      console.log('Crawl initiated, waiting for completion:', crawlId);
+      console.log('Crawl initiated, waiting for completion:', {
+        crawlId,
+        normalizedUrl
+      });
       
       const results = await this.waitForCrawlCompletion(crawlId);
       

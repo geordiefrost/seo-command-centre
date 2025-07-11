@@ -81,24 +81,39 @@ class GoogleOAuthService {
         throw new Error('Failed to open OAuth popup. Please check popup blockers.');
       }
 
-      // Wait for OAuth completion
+      // Wait for OAuth completion via postMessage
       return new Promise((resolve, reject) => {
+        const messageHandler = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) {
+            return;
+          }
+
+          if (event.data.type === 'OAUTH_SUCCESS') {
+            console.log('OAuth completed successfully');
+            window.removeEventListener('message', messageHandler);
+            resolve();
+          } else if (event.data.type === 'OAUTH_ERROR') {
+            console.error('OAuth error:', event.data.error);
+            window.removeEventListener('message', messageHandler);
+            reject(new Error(event.data.error));
+          }
+        };
+
+        window.addEventListener('message', messageHandler);
+
+        // Fallback: check if window is closed (user cancelled)
         const checkClosed = setInterval(() => {
           if (authWindow.closed) {
             clearInterval(checkClosed);
-            // Check if authentication was successful
-            if (this.isAuthenticated()) {
-              console.log('Google OAuth completed successfully');
-              resolve();
-            } else {
-              reject(new Error('OAuth flow was cancelled or failed'));
-            }
+            window.removeEventListener('message', messageHandler);
+            reject(new Error('OAuth flow was cancelled'));
           }
         }, 1000);
 
         // Timeout after 5 minutes
         setTimeout(() => {
           clearInterval(checkClosed);
+          window.removeEventListener('message', messageHandler);
           if (!authWindow.closed) {
             authWindow.close();
           }

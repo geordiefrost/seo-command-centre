@@ -121,7 +121,7 @@ class FirecrawlService {
 
     if (this.useMockData) {
       console.log('Using mock data for development');
-      return this.getMockFullCrawlResults(baseUrl, options.maxPages || 20);
+      return this.getMockFullCrawlResults(normalizedUrl, options.maxPages || 20);
     }
 
     try {
@@ -212,34 +212,62 @@ class FirecrawlService {
   }
 
   private async initiateCrawl(baseUrl: string, options: any): Promise<string> {
+    const requestPayload = {
+      url: baseUrl,
+      crawlerOptions: {
+        limit: options.limit || 50,
+        excludePaths: options.excludePaths || [],
+        includePaths: options.includePaths || []
+      },
+      pageOptions: {
+        onlyMainContent: true,
+        includeHtml: false
+      }
+    };
+
+    console.log('Firecrawl API Request:', {
+      url: `${this.baseURL}/crawl`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey?.substring(0, 10)}...`,
+      },
+      payload: requestPayload
+    });
+
     const response = await fetch(`${this.baseURL}/crawl`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.apiKey}`,
       },
-      body: JSON.stringify({
-        url: baseUrl,
-        crawlerOptions: {
-          limit: options.limit || 50,
-          excludePaths: options.excludePaths || [],
-          includePaths: options.includePaths || []
-        },
-        pageOptions: {
-          onlyMainContent: true,
-          includeHtml: false
-        }
-      }),
+      body: JSON.stringify(requestPayload),
+    });
+
+    console.log('Firecrawl API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
     });
 
     if (!response.ok) {
-      throw new Error(`Firecrawl crawl initiation failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Firecrawl API Error Response:', errorText);
+      throw new Error(`Firecrawl crawl initiation failed: ${response.status} ${response.statusText}. Response: ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('Firecrawl API Response Data:', data);
     
     if (!data.success) {
-      throw new Error(`Firecrawl crawl failed: ${data.error}`);
+      const errorMsg = data.error || 'Unknown error';
+      console.error('Firecrawl crawl failed:', data);
+      throw new Error(`Firecrawl crawl failed: ${errorMsg}`);
+    }
+
+    if (!data.id) {
+      console.error('Firecrawl response missing ID:', data);
+      throw new Error('Firecrawl API response missing crawl ID');
     }
 
     return data.id;

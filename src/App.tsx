@@ -6,6 +6,7 @@ import { useToolStore } from './store/toolStore';
 import { useIntegrationStore } from './store/integrationStore';
 import { Layout } from './components/layout';
 import { Dashboard, Login, Strategy, Content, Monitoring, Migration, Competitive, Automation, Clients } from './pages';
+import { GoogleOAuthCallback } from './components/auth/GoogleOAuthCallback';
 import { mockTools, mockIntegrationData } from './mock';
 import { supabase } from './lib/supabase';
 // import { quickDatabaseTest } from './utils/quickTest';
@@ -97,6 +98,10 @@ function App() {
             <Route 
               path="/login" 
               element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} 
+            />
+            <Route 
+              path="/auth/google/callback" 
+              element={<GoogleOAuthCallback />} 
             />
             <Route
               path="/"

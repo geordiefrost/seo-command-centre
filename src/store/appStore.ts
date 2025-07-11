@@ -30,6 +30,9 @@ interface AppState {
   setUser: (user: User | null) => void;
   setAuthenticated: (authenticated: boolean) => void;
   setClients: (clients: Client[]) => void;
+  addClient: (client: Client) => void;
+  updateClient: (clientId: string, updates: Partial<Client>) => void;
+  removeClient: (clientId: string) => void;
   selectClient: (clientId: string | null) => void;
   setTasks: (tasks: Task[]) => void;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
@@ -73,6 +76,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAuthenticated: (authenticated) => set({ isAuthenticated: authenticated }),
   
   setClients: (clients) => set({ clients }),
+  
+  addClient: (client) => {
+    const { clients } = get();
+    set({ clients: [...clients, client] });
+  },
+  
+  updateClient: (clientId, updates) => {
+    const { clients } = get();
+    const updatedClients = clients.map(client =>
+      client.id === clientId ? { ...client, ...updates } : client
+    );
+    set({ clients: updatedClients });
+  },
+  
+  removeClient: (clientId) => {
+    const { clients } = get();
+    set({ clients: clients.filter(client => client.id !== clientId) });
+  },
   
   selectClient: (clientId) => set({ selectedClientId: clientId }),
   

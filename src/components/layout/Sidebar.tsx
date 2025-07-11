@@ -11,6 +11,8 @@ import {
   Zap,
   BarChart3,
   X,
+  UserCheck,
+  Activity,
 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useIntegrationStore } from '../../store/integrationStore';
@@ -24,6 +26,7 @@ interface SidebarProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
+  { name: 'Clients', href: '/clients', icon: UserCheck },
   { name: 'Strategy', href: '/strategy', icon: Target },
   { name: 'Content', href: '/content', icon: PenTool },
   { name: 'Migration', href: '/migration', icon: ArrowRightLeft },

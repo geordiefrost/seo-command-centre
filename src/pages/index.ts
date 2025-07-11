@@ -1,5 +1,6 @@
 export { default as Dashboard } from './Dashboard';
 export { default as Login } from './Login';
+export { default as Clients } from './Clients';
 export { default as Strategy } from './Strategy';
 export { default as Content } from './Content';
 export { default as Monitoring } from './Monitoring';

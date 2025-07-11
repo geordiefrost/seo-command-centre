@@ -5,7 +5,7 @@ import { useAppStore } from './store/appStore';
 import { useToolStore } from './store/toolStore';
 import { useIntegrationStore } from './store/integrationStore';
 import { Layout } from './components/layout';
-import { Dashboard, Login, Strategy, Content, Monitoring, Migration, Competitive, Automation } from './pages';
+import { Dashboard, Login, Strategy, Content, Monitoring, Migration, Competitive, Automation, Clients } from './pages';
 import { mockTools, mockIntegrationData } from './mock';
 import { supabase } from './lib/supabase';
 // import { quickDatabaseTest } from './utils/quickTest';
@@ -105,6 +105,7 @@ function App() {
               }
             >
               <Route index element={<Dashboard />} />
+              <Route path="clients" element={<Clients />} />
               <Route path="strategy" element={<Strategy />} />
               <Route path="content" element={<Content />} />
               <Route path="migration" element={<Migration />} />

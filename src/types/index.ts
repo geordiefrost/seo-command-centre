@@ -5,6 +5,109 @@ export interface Client {
   type: 'retainer' | 'project';
   status: 'active' | 'paused' | 'archived';
   websiteUrl: string;
+  domain: string;
+  businessType: 'B2B' | 'B2C' | 'Local' | 'E-commerce';
+  primaryLocation: string;
+  targetMarkets: string[];
+  acceloCompanyId?: string;
+  searchConsolePropertyId?: string;
+  notes?: string;
+  createdAt: Date;
+}
+
+export interface ClientCompetitor {
+  id: string;
+  clientId: string;
+  competitorDomain: string;
+  competitorName?: string;
+  priority: number;
+  createdAt: Date;
+}
+
+export interface ClientContact {
+  id: string;
+  clientId: string;
+  name: string;
+  email: string;
+  role?: string;
+  isPrimary: boolean;
+  createdAt: Date;
+}
+
+export interface ClientBrandTerm {
+  id: string;
+  clientId: string;
+  term: string;
+  isRegex: boolean;
+  createdAt: Date;
+}
+
+export interface ClientCrawlData {
+  id: string;
+  clientId: string;
+  crawlType: 'quick' | 'full' | 'targeted' | 'scheduled';
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  pagesAnalyzed: number;
+  insights: Record<string, any>;
+  errorMessage?: string;
+  startedAt: Date;
+  completedAt?: Date;
+  createdAt: Date;
+}
+
+export interface KeywordResearchProject {
+  id: string;
+  clientId: string;
+  name: string;
+  description?: string;
+  dateRangeStart?: Date;
+  dateRangeEnd?: Date;
+  status: 'setup' | 'in_progress' | 'review' | 'completed' | 'archived';
+  assignedTo?: string;
+  settings: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Keyword {
+  id: string;
+  projectId: string;
+  keyword: string;
+  searchVolume?: number;
+  difficulty?: number;
+  currentPosition?: number;
+  competitionLevel?: number;
+  searchIntent?: 'informational' | 'navigational' | 'transactional' | 'commercial';
+  priorityScore?: number;
+  category?: string;
+  subCategory?: string;
+  landingPage?: string;
+  notes?: string;
+  source?: 'gsc' | 'dataforseo' | 'competitor' | 'manual';
+  isBranded: boolean;
+  isQuickWin: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface KeywordCategory {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  headTerm?: string;
+  keywordCount: number;
+  createdAt: Date;
+}
+
+export interface CompetitorAnalysis {
+  id: string;
+  projectId: string;
+  competitorDomain: string;
+  analysisData: Record<string, any>;
+  keywordsFound: number;
+  opportunitiesIdentified: number;
+  analyzedAt: Date;
   createdAt: Date;
 }
 

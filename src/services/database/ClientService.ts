@@ -16,6 +16,13 @@ export class ClientService {
       type: row.type,
       status: row.status,
       websiteUrl: row.website_url,
+      domain: row.domain,
+      businessType: row.business_type,
+      primaryLocation: row.primary_location,
+      targetMarkets: row.target_markets,
+      acceloCompanyId: row.accelo_company_id || undefined,
+      searchConsolePropertyId: row.search_console_property_id || undefined,
+      notes: row.notes || undefined,
       createdAt: new Date(row.created_at),
     };
   }
@@ -64,6 +71,13 @@ export class ClientService {
         type: client.type,
         status: client.status,
         website_url: client.websiteUrl,
+        domain: client.domain,
+        business_type: client.businessType,
+        primary_location: client.primaryLocation,
+        target_markets: client.targetMarkets,
+        accelo_company_id: client.acceloCompanyId,
+        search_console_property_id: client.searchConsolePropertyId,
+        notes: client.notes,
       };
 
       const { data, error } = await supabase
@@ -95,6 +109,13 @@ export class ClientService {
       if (updates.type !== undefined) clientData.type = updates.type;
       if (updates.status !== undefined) clientData.status = updates.status;
       if (updates.websiteUrl !== undefined) clientData.website_url = updates.websiteUrl;
+      if (updates.domain !== undefined) clientData.domain = updates.domain;
+      if (updates.businessType !== undefined) clientData.business_type = updates.businessType;
+      if (updates.primaryLocation !== undefined) clientData.primary_location = updates.primaryLocation;
+      if (updates.targetMarkets !== undefined) clientData.target_markets = updates.targetMarkets;
+      if (updates.acceloCompanyId !== undefined) clientData.accelo_company_id = updates.acceloCompanyId;
+      if (updates.searchConsolePropertyId !== undefined) clientData.search_console_property_id = updates.searchConsolePropertyId;
+      if (updates.notes !== undefined) clientData.notes = updates.notes;
 
       const { data, error } = await supabase
         .from('clients')

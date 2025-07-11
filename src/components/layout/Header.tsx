@@ -34,7 +34,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         
         <div className="hidden md:block">
           <h1 className="text-xl font-semibold text-gray-900">
-            SEO Command Centre
+            Bang SEO Command Centre
           </h1>
         </div>
       </div>

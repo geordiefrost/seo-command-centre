@@ -47,10 +47,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       <div className="flex items-center justify-between p-4 border-b border-gray-800">
         <div className="flex items-center space-x-3">
           <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">SC</span>
+            <span className="text-white font-bold text-sm">BSC</span>
           </div>
           {!sidebarCollapsed && (
-            <span className="font-semibold text-sm">SEO Command Centre</span>
+            <span className="font-semibold text-sm">Bang SEO Command Centre</span>
           )}
         </div>
         

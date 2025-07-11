@@ -63,10 +63,10 @@ const Login: React.FC = () => {
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="h-12 w-12 bg-primary-600 rounded-lg flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-lg">SC</span>
+            <span className="text-white font-bold text-lg">BSC</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
-          <p className="text-gray-600 mt-2">Sign in to SEO Command Centre</p>
+          <p className="text-gray-600 mt-2">Sign in to Bang SEO Command Centre</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">

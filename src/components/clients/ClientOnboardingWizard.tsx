@@ -22,7 +22,8 @@ import {
 import { Card, Button, Input, Select } from '../common';
 import { useAppStore } from '../../store/appStore';
 import { supabase } from '../../lib/supabase';
-import FirecrawlService, { QuickCrawlInsights } from '../../services/integrations/FirecrawlService';\nimport GoogleOAuthService from '../../services/integrations/GoogleOAuthService';
+import FirecrawlService, { QuickCrawlInsights } from '../../services/integrations/FirecrawlService';
+import GoogleOAuthService from '../../services/integrations/GoogleOAuthService';
 import { Client, ClientContact, ClientCompetitor, ClientBrandTerm } from '../../types';
 
 interface OnboardingStep {
@@ -162,16 +163,7 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
     }
   };
 
-  const addContact = () => {
-    if (newContact.name && newContact.email) {
-      updateFormData('contacts', [...formData.contacts, newContact]);
-      setNewContact({ name: '', email: '', role: '', isPrimary: false });
-    }
-  };
-
-  const removeContact = (index: number) => {
-    updateFormData('contacts', formData.contacts.filter((_, i) => i !== index));
-  };
+  // Contact management removed - no longer needed
 
   const addCompetitor = () => {
     if (newCompetitor.domain) {
@@ -813,7 +805,7 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
               <div>
                 <h5 className="font-medium mb-2">Contacts & Brand</h5>
                 <div className="space-y-1 text-sm">
-                  <p><span className="font-medium">Contacts:</span> {formData.contacts.length}</p>
+                  <p><span className="font-medium">Contacts:</span> 0</p>
                   <p><span className="font-medium">Brand Terms:</span> {formData.brandTerms.length}</p>
                 </div>
               </div>

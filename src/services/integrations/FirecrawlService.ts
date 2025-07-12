@@ -333,7 +333,7 @@ class FirecrawlService {
       h1: h1Match ? h1Match[1] : '',
       h2: h2Matches ? h2Matches.map((h: string) => h.replace(/^## /, '')) : [],
       h3: h3Matches ? h3Matches.map((h: string) => h.replace(/^### /, '')) : [],
-      wordCount: content.split(/\s+/).filter(word => word.length > 0).length,
+      wordCount: content.split(/\s+/).filter((word: string) => word.length > 0).length,
       images: this.extractImages(html),
       links: this.extractLinks(html),
       metadata: metadata

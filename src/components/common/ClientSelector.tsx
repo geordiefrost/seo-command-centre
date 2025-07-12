@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronDown, Building, Check } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useAppStore } from '../../store/appStore';
-import { Button } from './Button';
+import Button from './Button';
 import { cn } from '../../lib/utils';
 
 interface ClientSelectorProps {

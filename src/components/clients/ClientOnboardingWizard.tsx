@@ -24,7 +24,7 @@ import { useAppStore } from '../../store/appStore';
 import { supabase } from '../../lib/supabase';
 import FirecrawlService, { QuickCrawlInsights } from '../../services/integrations/FirecrawlService';
 import GoogleOAuthService from '../../services/integrations/GoogleOAuthService';
-import { Client, ClientContact, ClientCompetitor, ClientBrandTerm } from '../../types';
+import { Client, ClientCompetitor, ClientBrandTerm } from '../../types';
 
 interface OnboardingStep {
   id: string;
@@ -896,9 +896,8 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
                 </div>
               </div>
               <div>
-                <h5 className="font-medium mb-2">Contacts & Brand</h5>
+                <h5 className="font-medium mb-2">Brand Terms</h5>
                 <div className="space-y-1 text-sm">
-                  <p><span className="font-medium">Contacts:</span> 0</p>
                   <p><span className="font-medium">Brand Terms:</span> {formData.brandTerms.length}</p>
                 </div>
               </div>
@@ -918,8 +917,6 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
       case 'website':
         return formData.websiteUrl && formData.domain;
       case 'market':
-        return true; // Optional step
-      case 'contacts':
         return true; // Optional step
       case 'complete':
         return true;

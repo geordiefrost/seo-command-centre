@@ -350,35 +350,6 @@ export interface Database {
           created_at?: string;
         };
       };
-      client_contacts: {
-        Row: {
-          id: string;
-          client_id: string;
-          name: string;
-          email: string;
-          role?: string;
-          is_primary: boolean;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          client_id: string;
-          name: string;
-          email: string;
-          role?: string;
-          is_primary?: boolean;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          client_id?: string;
-          name?: string;
-          email?: string;
-          role?: string;
-          is_primary?: boolean;
-          created_at?: string;
-        };
-      };
       client_brand_terms: {
         Row: {
           id: string;

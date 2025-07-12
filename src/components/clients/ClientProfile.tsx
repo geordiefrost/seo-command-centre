@@ -30,7 +30,6 @@ import { supabase } from '../../lib/supabase';
 import FirecrawlService, { QuickCrawlInsights } from '../../services/integrations/FirecrawlService';
 import { 
   Client, 
-  ClientContact, 
   ClientCompetitor, 
   ClientBrandTerm,
   ClientCrawlData 
@@ -50,14 +49,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
   onStartKeywordResearch
 }) => {
   const { clients } = useAppStore();
-  const [contacts, setContacts] = useState<ClientContact[]>([]);
   const [competitors, setCompetitors] = useState<ClientCompetitor[]>([]);
   const [brandTerms, setBrandTerms] = useState<ClientBrandTerm[]>([]);
   const [crawlData, setCrawlData] = useState<ClientCrawlData[]>([]);
   const [latestInsights, setLatestInsights] = useState<QuickCrawlInsights | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCrawling, setIsCrawling] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'contacts' | 'competitors' | 'insights'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'competitors' | 'insights'>('overview');
 
   useEffect(() => {
     loadClientData();
@@ -66,12 +64,6 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
   const loadClientData = async () => {
     setIsLoading(true);
     try {
-      // Load contacts
-      const { data: contactsData } = await supabase
-        .from('client_contacts')
-        .select('*')
-        .eq('client_id', client.id);
-
       // Load competitors
       const { data: competitorsData } = await supabase
         .from('client_competitors')
@@ -92,7 +84,6 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
         .eq('client_id', client.id)
         .order('created_at', { ascending: false });
 
-      setContacts(contactsData || []);
       setCompetitors(competitorsData || []);
       setBrandTerms(brandTermsData || []);
       setCrawlData(crawlDataRaw || []);
@@ -232,10 +223,6 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span>Contacts:</span>
-              <span className="font-medium">{contacts.length}</span>
-            </div>
-            <div className="flex justify-between">
               <span>Competitors:</span>
               <span className="font-medium">{competitors.length}</span>
             </div>
@@ -373,60 +360,6 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
     </div>
   );
 
-  const renderContacts = () => (
-    <div className="space-y-4">
-      {contacts.length === 0 ? (
-        <Card className="p-8 text-center">
-          <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Contacts Added</h3>
-          <p className="text-gray-600 mb-4">Add client contacts to manage communication</p>
-          <Button onClick={onEdit} icon={Plus}>
-            Add Contact
-          </Button>
-        </Card>
-      ) : (
-        contacts.map((contact, index) => (
-          <Card key={index} className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Users className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-medium text-gray-900">{contact.name}</h4>
-                    {contact.isPrimary && (
-                      <Badge className="bg-blue-100 text-blue-800">Primary</Badge>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div className="flex items-center">
-                      <Mail className="h-3 w-3 mr-1" />
-                      {contact.email}
-                    </div>
-                    {contact.role && (
-                      <div className="flex items-center">
-                        <Building className="h-3 w-3 mr-1" />
-                        {contact.role}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open(`mailto:${contact.email}`)}
-                  icon={Mail}
-                ></Button>
-              </div>
-            </div>
-          </Card>
-        ))
-      )}
-    </div>
-  );
 
   const renderCompetitors = () => (
     <div className="space-y-4">
@@ -559,7 +492,6 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Eye },
-    { id: 'contacts', label: 'Contacts', icon: Users },
     { id: 'competitors', label: 'Competitors', icon: Target },
     { id: 'insights', label: 'Insights', icon: Bot }
   ];
@@ -632,7 +564,6 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
       {/* Tab Content */}
       <div>
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'contacts' && renderContacts()}
         {activeTab === 'competitors' && renderCompetitors()}
         {activeTab === 'insights' && renderInsights()}
       </div>

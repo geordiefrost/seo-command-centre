@@ -24,15 +24,6 @@ export interface ClientCompetitor {
   createdAt: Date;
 }
 
-export interface ClientContact {
-  id: string;
-  clientId: string;
-  name: string;
-  email: string;
-  role?: string;
-  isPrimary: boolean;
-  createdAt: Date;
-}
 
 export interface ClientBrandTerm {
   id: string;

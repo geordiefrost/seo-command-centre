@@ -44,7 +44,7 @@ export interface QuickCrawlInsights {
 class FirecrawlService {
   private useMockData = import.meta.env.VITE_MOCK_MODE === 'true';
   private apiKey = import.meta.env.VITE_FIRECRAWL_API_KEY;
-  private baseURL = 'https://api.firecrawl.dev/v0';
+  private baseURL = 'https://api.firecrawl.dev/v1';
 
   async quickCrawl(url: string): Promise<QuickCrawlInsights> {
     try {
@@ -187,25 +187,28 @@ class FirecrawlService {
       },
       body: JSON.stringify({
         url,
-        pageOptions: {
-          includeHtml: options.includeHtml || false,
-          includePdf: options.includePdf || false,
-          onlyMainContent: options.onlyMainContent || true,
-          includeRawHtml: options.includeRawHtml || false,
-          waitFor: options.waitFor || 0,
-          timeout: options.timeout || 30000
-        }
+        formats: ['markdown', 'html'],
+        onlyMainContent: options.onlyMainContent !== false,
+        actions: options.waitFor ? [{ type: 'wait', milliseconds: options.waitFor }] : [],
+        timeout: options.timeout || 30000
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Firecrawl API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Firecrawl scrape API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      throw new Error(`Firecrawl scrape failed: ${response.status} ${response.statusText}. ${errorText}`);
     }
 
     const data = await response.json();
     
     if (!data.success) {
-      throw new Error(`Firecrawl scraping failed: ${data.error}`);
+      console.error('Firecrawl scrape response indicates failure:', data);
+      throw new Error(`Firecrawl scraping failed: ${data.error || 'Unknown error'}`);
     }
 
     return this.transformFirecrawlData(data.data);
@@ -214,14 +217,12 @@ class FirecrawlService {
   private async initiateCrawl(baseUrl: string, options: any): Promise<string> {
     const requestPayload = {
       url: baseUrl,
-      crawlerOptions: {
-        limit: options.limit || 50,
-        excludePaths: options.excludePaths || [],
-        includePaths: options.includePaths || []
-      },
-      pageOptions: {
-        onlyMainContent: true,
-        includeHtml: false
+      limit: options.limit || 50,
+      excludePaths: options.excludePaths || [],
+      includePaths: options.includePaths || [],
+      scrapeOptions: {
+        formats: ['markdown', 'html'],
+        onlyMainContent: true
       }
     };
 
@@ -289,13 +290,24 @@ class FirecrawlService {
       }
 
       const data = await response.json();
+      console.log(`Crawl status check ${attempt + 1}/${maxAttempts}:`, {
+        crawlId,
+        status: data.status,
+        completed: data.completed || 0,
+        total: data.total || 0
+      });
 
       if (data.status === 'completed') {
+        console.log('Crawl completed successfully:', {
+          crawlId,
+          pagesCount: data.data?.length || 0
+        });
         return data.data.map((item: any) => this.transformFirecrawlData(item));
       }
 
       if (data.status === 'failed') {
-        throw new Error(`Crawl failed: ${data.error}`);
+        console.error('Crawl failed:', data);
+        throw new Error(`Crawl failed: ${data.error || 'Unknown error'}`);
       }
 
       await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -305,25 +317,26 @@ class FirecrawlService {
   }
 
   private transformFirecrawlData(data: any): FirecrawlResult {
-    const content = data.content || '';
+    const content = data.markdown || data.content || '';
     const html = data.html || '';
+    const metadata = data.metadata || {};
     
     const h1Match = content.match(/^# (.+)$/m);
     const h2Matches = content.match(/^## (.+)$/gm);
     const h3Matches = content.match(/^### (.+)$/gm);
 
     return {
-      url: data.url || '',
-      title: data.title || '',
-      description: data.description || '',
+      url: data.url || metadata.sourceURL || '',
+      title: metadata.title || data.title || '',
+      description: metadata.description || data.description || '',
       content: content,
       h1: h1Match ? h1Match[1] : '',
       h2: h2Matches ? h2Matches.map((h: string) => h.replace(/^## /, '')) : [],
       h3: h3Matches ? h3Matches.map((h: string) => h.replace(/^### /, '')) : [],
-      wordCount: content.split(/\s+/).length,
+      wordCount: content.split(/\s+/).filter(word => word.length > 0).length,
       images: this.extractImages(html),
       links: this.extractLinks(html),
-      metadata: data.metadata || {}
+      metadata: metadata
     };
   }
 

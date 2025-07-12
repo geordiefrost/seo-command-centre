@@ -5,7 +5,7 @@ import { useAppStore } from './store/appStore';
 import { useToolStore } from './store/toolStore';
 import { useIntegrationStore } from './store/integrationStore';
 import { Layout } from './components/layout';
-import { Dashboard, Login, Strategy, Content, Monitoring, Migration, Competitive, Automation, Clients } from './pages';
+import { Dashboard, Login, Strategy, Content, Monitoring, Migration, Competitive, Automation, Clients, KeywordResearch } from './pages';
 import { GoogleOAuthCallback } from './components/auth/GoogleOAuthCallback';
 import { mockTools, mockIntegrationData } from './mock';
 import { supabase } from './lib/supabase';
@@ -112,6 +112,7 @@ function App() {
               <Route index element={<Dashboard />} />
               <Route path="clients" element={<Clients />} />
               <Route path="strategy" element={<Strategy />} />
+              <Route path="keyword-research" element={<KeywordResearch />} />
               <Route path="content" element={<Content />} />
               <Route path="migration" element={<Migration />} />
               <Route path="monitoring" element={<Monitoring />} />

@@ -13,6 +13,7 @@ import {
   X,
   UserCheck,
   Activity,
+  Search,
 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useIntegrationStore } from '../../store/integrationStore';
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Clients', href: '/clients', icon: UserCheck },
   { name: 'Strategy', href: '/strategy', icon: Target },
+  { name: 'Keyword Research', href: '/keyword-research', icon: Search },
   { name: 'Content', href: '/content', icon: PenTool },
   { name: 'Migration', href: '/migration', icon: ArrowRightLeft },
   { name: 'Monitoring', href: '/monitoring', icon: Shield },

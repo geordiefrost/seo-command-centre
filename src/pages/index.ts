@@ -7,3 +7,4 @@ export { default as Monitoring } from './Monitoring';
 export { default as Migration } from './Migration';
 export { default as Competitive } from './Competitive';
 export { default as Automation } from './Automation';
+export { default as KeywordResearch } from './KeywordResearch';

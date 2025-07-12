@@ -2,7 +2,7 @@ import React from 'react';
 import { Menu, Bell, Search, User, Settings, LogOut } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useAppStore } from '../../store/appStore';
-import { Button, Input, Badge } from '../common';
+import { Button, Input, Badge, ClientSelector } from '../common';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
 
@@ -53,14 +53,22 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         </div>
       </div>
       
-      {/* Center - Search */}
-      <div className="flex-1 max-w-xl mx-4">
-        <div className="relative">
-          <Input
-            placeholder="Search tools, clients, tasks..."
-            icon={Search}
-            className="pl-10"
-          />
+      {/* Center - Client Selector & Search */}
+      <div className="flex-1 max-w-4xl mx-4 flex items-center space-x-4">
+        {/* Client Selector */}
+        <div className="flex-shrink-0">
+          <ClientSelector />
+        </div>
+        
+        {/* Search */}
+        <div className="flex-1 max-w-xl">
+          <div className="relative">
+            <Input
+              placeholder="Search tools, clients, tasks..."
+              icon={Search}
+              className="pl-10"
+            />
+          </div>
         </div>
       </div>
       

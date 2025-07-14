@@ -16,9 +16,8 @@ import { Button, Input } from '../../common';
 interface KeywordData {
   keyword: string;
   searchVolume?: number;
-  difficulty?: number;
   source: 'manual' | 'gsc' | 'competitor';
-  competition?: number;
+  competition?: string; // LOW, MEDIUM, HIGH
   cpc?: number;
   intent?: 'informational' | 'navigational' | 'transactional' | 'commercial';
   // GSC specific fields
@@ -36,7 +35,7 @@ interface KeywordResultsTableProps {
   onKeywordSelect?: (keyword: KeywordData) => void;
 }
 
-type SortField = 'keyword' | 'searchVolume' | 'difficulty' | 'clicks' | 'impressions' | 'position' | 'cpc';
+type SortField = 'keyword' | 'searchVolume' | 'competition' | 'clicks' | 'impressions' | 'position' | 'cpc';
 type SortDirection = 'asc' | 'desc';
 
 const sourceLabels = {
@@ -155,11 +154,12 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
     return `$${num.toFixed(2)}`;
   };
 
-  const getDifficultyColor = (difficulty?: number): string => {
-    if (!difficulty) return 'text-gray-500';
-    if (difficulty < 30) return 'text-green-600';
-    if (difficulty < 60) return 'text-yellow-600';
-    return 'text-red-600';
+  const getCompetitionColor = (competition?: string): string => {
+    if (!competition) return 'text-gray-500';
+    if (competition === 'LOW') return 'text-green-600';
+    if (competition === 'MEDIUM') return 'text-yellow-600';
+    if (competition === 'HIGH') return 'text-red-600';
+    return 'text-gray-500';
   };
 
   const getPositionColor = (position?: number): string => {
@@ -295,12 +295,12 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
               </th>
               <th 
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('difficulty')}
+                onClick={() => handleSort('competition')}
               >
                 <div className="flex items-center space-x-1">
                   <Target className="h-3 w-3" />
-                  <span>Difficulty</span>
-                  {getSortIcon('difficulty')}
+                  <span>Competition</span>
+                  {getSortIcon('competition')}
                 </div>
               </th>
               <th 
@@ -370,10 +370,10 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   <div className="flex items-center space-x-1">
-                    <span className={getDifficultyColor(keyword.difficulty)}>
-                      {keyword.difficulty && keyword.difficulty > 0 ? `${keyword.difficulty}%` : '-'}
+                    <span className={getCompetitionColor(keyword.competition)}>
+                      {keyword.competition || '-'}
                     </span>
-                    {keyword.difficulty && keyword.difficulty > 0 && (
+                    {keyword.competition && (
                       <span className="text-xs text-blue-600" title="Data from DataForSEO">API</span>
                     )}
                   </div>

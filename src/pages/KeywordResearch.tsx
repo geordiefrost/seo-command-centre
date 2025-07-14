@@ -115,14 +115,14 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
       const transformedKeywords = (keywords || []).map(keyword => ({
         keyword: keyword.keyword,
         searchVolume: keyword.search_volume || undefined,
-        difficulty: keyword.difficulty || undefined,
+        competition: keyword.competition || undefined,
         source: keyword.source || 'manual',
-        competition: keyword.competition_level ? keyword.competition_level / 100 : undefined,
+        cpc: keyword.cpc || undefined,
         intent: keyword.search_intent || undefined,
-        clicks: undefined, // These would come from separate GSC data
-        impressions: undefined,
-        ctr: undefined,
-        position: undefined
+        clicks: keyword.gsc_clicks || undefined,
+        impressions: keyword.gsc_impressions || undefined,
+        ctr: keyword.gsc_ctr || undefined,
+        position: keyword.gsc_position || undefined
       }));
       
       setProjectKeywords(transformedKeywords);
@@ -248,7 +248,7 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
                 <ArrowRight className="h-8 w-8 text-orange-600 mr-3" />
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {projectKeywords.filter(k => (k.searchVolume || 0) > 100 && (k.difficulty || 0) < 30).length}
+                    {projectKeywords.filter(k => (k.searchVolume || 0) > 100 && k.competition === 'LOW').length}
                   </div>
                   <div className="text-sm text-gray-600">Quick Wins</div>
                 </div>

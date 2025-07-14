@@ -41,7 +41,6 @@ interface CompetitorData {
 interface KeywordData {
   keyword: string;
   searchVolume?: number;
-  difficulty?: number;
   source: 'manual' | 'gsc' | 'competitor';
   competition?: number;
   cpc?: number;
@@ -257,9 +256,8 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       const transformedKeywords: KeywordData[] = gscData.map(gscKeyword => ({
         keyword: gscKeyword.keyword,
         searchVolume: undefined, // GSC doesn't provide search volume
-        difficulty: undefined, // GSC doesn't provide difficulty
         source: 'gsc' as const,
-        competition: undefined,
+        competition: undefined, // GSC doesn't provide competition data initially
         cpc: undefined,
         intent: gscKeyword.intent,
         // Additional GSC specific data
@@ -357,7 +355,6 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       allKeywords.push(...seedKeywordData.map(k => ({
         keyword: k.keyword,
         searchVolume: k.searchVolume,
-        difficulty: k.difficulty,
         source: 'manual' as const,
         competition: k.competition,
         cpc: k.cpc,
@@ -366,12 +363,12 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
 
       // Enrich GSC keywords with DataForSEO data
       if (gscKeywords.length > 0) {
-        setProcessingStatus('Enriching GSC keywords with volume and difficulty data...');
+        setProcessingStatus('Enriching GSC keywords with volume and competition data...');
         try {
           const gscKeywordStrings = gscKeywords.map(k => k.keyword);
           const enrichedGSCData = await DataForSEOService.getKeywordData(gscKeywordStrings);
           
-          // Merge GSC performance data with DataForSEO volume/difficulty data
+          // Merge GSC performance data with DataForSEO volume/competition data
           const mergedGSCKeywords = gscKeywords.map(gscKeyword => {
             const dataForSEOData = enrichedGSCData.find(d => 
               d.keyword.toLowerCase() === gscKeyword.keyword.toLowerCase()
@@ -380,7 +377,6 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
             return {
               ...gscKeyword,
               searchVolume: dataForSEOData?.searchVolume || gscKeyword.searchVolume,
-              difficulty: dataForSEOData?.difficulty || gscKeyword.difficulty,
               cpc: dataForSEOData?.cpc || gscKeyword.cpc,
               competition: dataForSEOData?.competition || gscKeyword.competition,
               intent: dataForSEOData?.intent || gscKeyword.intent
@@ -405,9 +401,8 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           const competitorData = competitorKeywords.slice(0, 50).map((k: any) => ({
             keyword: k.keyword,
             searchVolume: k.volume || 0,
-            difficulty: Math.floor(Math.random() * 100), // Mock difficulty
             source: 'competitor' as const,
-            competition: Math.random(),
+            competition: ['LOW', 'MEDIUM', 'HIGH'][Math.floor(Math.random() * 3)], // Mock competition
             cpc: Math.random() * 5,
             intent: ['informational', 'commercial', 'transactional', 'navigational'][
               Math.floor(Math.random() * 4)
@@ -435,7 +430,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       const commercial = uniqueKeywords.filter(k => k.intent === 'commercial').length;
       const informational = uniqueKeywords.filter(k => k.intent === 'informational').length;
       const quickWins = uniqueKeywords.filter(k => 
-        (k.searchVolume || 0) > 100 && (k.difficulty || 0) < 30
+        (k.searchVolume || 0) > 100 && k.competition === 'LOW'
       ).length;
 
       setKeywordStats({
@@ -529,13 +524,17 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           project_id: projectId,
           keyword: keyword.keyword,
           search_volume: keyword.searchVolume || null,
-          difficulty: keyword.difficulty || null,
-          competition_level: keyword.competition ? Math.round(keyword.competition * 100) : null,
+          competition: keyword.competition || null,
+          cpc: keyword.cpc || null,
           search_intent: keyword.intent || null,
           source: keyword.source,
+          gsc_clicks: keyword.clicks || null,
+          gsc_impressions: keyword.impressions || null,
+          gsc_ctr: keyword.ctr || null,
+          gsc_position: keyword.position || null,
           is_branded: selectedClient?.name ? 
             keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
-          is_quick_win: (keyword.searchVolume || 0) > 100 && (keyword.difficulty || 0) < 30
+          is_quick_win: (keyword.searchVolume || 0) > 100 && keyword.competition === 'LOW'
         }));
 
         await supabase
@@ -931,7 +930,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
               <h4 className="font-medium text-gray-900 mb-2">Key Insights</h4>
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                 <ul className="space-y-2 text-sm text-blue-800">
-                  <li>• Found {keywordStats.quickWins} quick win opportunities (high volume, low difficulty)</li>
+                  <li>• Found {keywordStats.quickWins} quick win opportunities (high volume, low competition)</li>
                   <li>• Identified {keywordStats.commercial} commercial intent keywords for conversion focus</li>
                   <li>• Discovered {keywordStats.informational} informational keywords for content marketing</li>
                   {selectedCompetitors.filter(c => !c.isExisting).length > 0 && (

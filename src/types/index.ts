@@ -65,7 +65,6 @@ export interface Keyword {
   projectId: string;
   keyword: string;
   searchVolume?: number;
-  difficulty?: number;
   currentPosition?: number;
   competitionLevel?: number;
   searchIntent?: 'informational' | 'navigational' | 'transactional' | 'commercial';
@@ -210,7 +209,6 @@ export interface TaskFilters {
 export interface KeywordData {
   keyword: string;
   searchVolume: number;
-  difficulty: number;
   cpc: number;
   trend: number[];
   competition: number;
@@ -225,7 +223,7 @@ export interface SERPAnalysis {
   featuredSnippets: FeaturedSnippet[];
   relatedQuestions: RelatedQuestion[];
   searchVolume: number;
-  difficulty: number;
+  competition: number;
 }
 
 export interface OrganicResult {

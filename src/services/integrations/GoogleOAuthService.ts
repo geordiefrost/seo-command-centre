@@ -694,18 +694,18 @@ class GoogleOAuthService {
   private determineSearchIntent(keyword: string): 'informational' | 'navigational' | 'transactional' | 'commercial' {
     const lowerKeyword = keyword.toLowerCase();
     
-    // Transactional keywords
-    if (/\b(buy|purchase|order|checkout|cart|price|cost|shop|store)\b/.test(lowerKeyword)) {
+    // Transactional keywords (buying intent)
+    if (/\b(buy|purchase|order|checkout|cart|price|cost|shop|store|sale|deal|discount|coupon)\b/.test(lowerKeyword)) {
       return 'transactional';
     }
     
-    // Commercial keywords
-    if (/\b(best|top|review|compare|vs|versus|alternative|cheap|deal|discount)\b/.test(lowerKeyword)) {
+    // Commercial keywords (comparison/research before buying)
+    if (/\b(best|top|review|compare|vs|versus|alternative|cheap|affordable|pricing|quote|estimate)\b/.test(lowerKeyword)) {
       return 'commercial';
     }
     
-    // Navigational keywords
-    if (/\b(login|sign in|contact|about|home|website|official|app)\b/.test(lowerKeyword)) {
+    // Navigational keywords (looking for specific site/brand)
+    if (/\b(login|sign in|contact|about|home|website|official|app|dashboard|account)\b/.test(lowerKeyword)) {
       return 'navigational';
     }
     

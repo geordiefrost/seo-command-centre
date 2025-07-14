@@ -196,7 +196,7 @@ class DataForSEOService {
       await new Promise(resolve => setTimeout(resolve, 600));
       return keywords.map(keyword => ({
         keyword,
-        difficulty: Math.floor(Math.random() * 100),
+        competition: ['LOW', 'MEDIUM', 'HIGH'][Math.floor(Math.random() * 3)],
         searchVolume: Math.floor(Math.random() * 10000),
         cpc: Math.random() * 10,
       }));
@@ -214,7 +214,7 @@ class DataForSEOService {
       console.warn('DataForSEO difficulty API failed, falling back to mock data:', error);
       return keywords.map(keyword => ({
         keyword,
-        difficulty: Math.floor(Math.random() * 100),
+        competition: ['LOW', 'MEDIUM', 'HIGH'][Math.floor(Math.random() * 3)],
         searchVolume: Math.floor(Math.random() * 10000),
         cpc: Math.random() * 10,
       }));
@@ -367,12 +367,11 @@ class DataForSEOService {
       const transformed = {
         keyword: item.keyword || item.query || '',
         searchVolume: item.search_volume || item.volume || 0,
-        difficulty: item.keyword_difficulty || item.competition_index || item.difficulty || 0,
+        competition: item.competition || 'UNKNOWN', // Use competition directly (LOW/MEDIUM/HIGH)
         cpc: item.cpc || item.average_cpc || 0,
-        competition: item.competition || item.competition_index || 0,
         trend: item.monthly_searches?.map((m: any) => m.search_volume) || [],
         relatedKeywords: item.related_keywords || [],
-        intent: this.determineSearchIntent(item.keyword_annotations || {}),
+        intent: this.determineSearchIntent(item.keyword || item.query || ''),
       };
       
       return transformed;
@@ -431,7 +430,7 @@ class DataForSEOService {
     
     return response.map((item: any) => ({
       keyword: item.keyword || '',
-      difficulty: item.keyword_difficulty || 0,
+      competition: item.competition || 'UNKNOWN',
       searchVolume: item.search_volume || 0,
       cpc: item.cpc || 0,
     }));
@@ -457,10 +456,25 @@ class DataForSEOService {
     };
   }
   
-  private determineSearchIntent(annotations: any): 'informational' | 'commercial' | 'transactional' | 'navigational' {
-    if (annotations.commercial_intent > 0.7) return 'commercial';
-    if (annotations.transactional_intent > 0.7) return 'transactional';
-    if (annotations.navigational_intent > 0.7) return 'navigational';
+  private determineSearchIntent(keyword: string): 'informational' | 'commercial' | 'transactional' | 'navigational' {
+    const lowerKeyword = keyword.toLowerCase();
+    
+    // Transactional keywords (buying intent)
+    if (/\b(buy|purchase|order|checkout|cart|price|cost|shop|store|sale|deal|discount|coupon)\b/.test(lowerKeyword)) {
+      return 'transactional';
+    }
+    
+    // Commercial keywords (comparison/research before buying)
+    if (/\b(best|top|review|compare|vs|versus|alternative|cheap|affordable|pricing|quote|estimate)\b/.test(lowerKeyword)) {
+      return 'commercial';
+    }
+    
+    // Navigational keywords (looking for specific site/brand)
+    if (/\b(login|sign in|contact|about|home|website|official|app|dashboard|account)\b/.test(lowerKeyword)) {
+      return 'navigational';
+    }
+    
+    // Default to informational (how-to, what is, etc.)
     return 'informational';
   }
   

@@ -158,13 +158,16 @@ class DataForSEOService {
       throw new Error('DataForSEO credentials not configured');
     }
     
+    // DataForSEO API expects an array of tasks
+    const payload = Array.isArray(data) ? data : [data];
+    
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${btoa(`${this.apiLogin}:${this.apiPassword}`)}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     
     if (!response.ok) {

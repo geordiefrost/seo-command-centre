@@ -53,10 +53,7 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
     try {
       let query = supabase
         .from('keyword_research_projects')
-        .select(`
-          *,
-          keywords(count)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       // Filter by selected client if one is chosen
@@ -68,11 +65,20 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
 
       if (error) throw error;
 
-      // Transform data to include keyword count
-      const projectsWithCounts = data?.map(project => ({
-        ...project,
-        keywordCount: project.keywords?.[0]?.count || 0
-      })) || [];
+      // Get keyword counts separately for each project
+      const projectsWithCounts = await Promise.all(
+        (data || []).map(async (project) => {
+          const { count } = await supabase
+            .from('keywords')
+            .select('*', { count: 'exact' })
+            .eq('project_id', project.id);
+          
+          return {
+            ...project,
+            keywordCount: count || 0
+          };
+        })
+      );
 
       setProjects(projectsWithCounts);
     } catch (error) {

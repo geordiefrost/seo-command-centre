@@ -101,10 +101,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
   // Form data
   const [projectData, setProjectData] = useState({
     name: editingProject?.name || '',
-    description: editingProject?.description || '',
-    dateRangeStart: editingProject?.dateRangeStart || '',
-    dateRangeEnd: editingProject?.dateRangeEnd || '',
-    assignedTo: editingProject?.assignedTo || ''
+    description: editingProject?.description || ''
   });
 
   const [seedKeywords, setSeedKeywords] = useState<string[]>(
@@ -166,6 +163,10 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
 
   const handleRemoveSeedKeyword = (keyword: string) => {
     setSeedKeywords(seedKeywords.filter(k => k !== keyword));
+  };
+
+  const handleRemoveGSCKeyword = (index: number) => {
+    setGscKeywords(gscKeywords.filter((_, i) => i !== index));
   };
 
   const handleLoadGSCKeywords = async () => {
@@ -313,15 +314,16 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
     setProcessingStatus('Saving project...');
 
     try {
+      // Get current user (you may need to adjust this based on your auth setup)
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // Create or update project
       const projectPayload = {
         client_id: clientId,
         name: projectData.name,
         description: projectData.description,
-        date_range_start: projectData.dateRangeStart || null,
-        date_range_end: projectData.dateRangeEnd || null,
         status: 'completed',
-        assigned_to: projectData.assignedTo || null,
+        assigned_to: user?.email || null,
         settings: {
           seedKeywords,
           selectedCompetitors,
@@ -423,7 +425,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
     switch (currentStep) {
       case 0: return projectData.name.trim().length > 0;
       case 1: return seedKeywords.length > 0 || gscKeywords.length > 0;
-      case 2: return selectedCompetitors.length > 0;
+      case 2: return true; // Competitors are optional
       case 3: return true;
       case 4: return discoveredKeywords.length > 0;
       default: return true;
@@ -460,39 +462,6 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start Date
-                </label>
-                <Input
-                  type="date"
-                  value={projectData.dateRangeStart}
-                  onChange={(e) => setProjectData({...projectData, dateRangeStart: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End Date
-                </label>
-                <Input
-                  type="date"
-                  value={projectData.dateRangeEnd}
-                  onChange={(e) => setProjectData({...projectData, dateRangeEnd: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Assigned To
-              </label>
-              <Input
-                value={projectData.assignedTo}
-                onChange={(e) => setProjectData({...projectData, assignedTo: e.target.value})}
-                placeholder="Team member name"
-              />
-            </div>
           </div>
         );
 
@@ -551,10 +520,31 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
               </div>
               
               {gscKeywords.length > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                  <p className="text-sm text-green-800">
+                <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                  <p className="text-sm text-green-800 mb-3">
                     ✓ Imported {gscKeywords.length} keywords from Google Search Console
                   </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {gscKeywords.map((keyword, index) => (
+                      <div key={index} className="flex justify-between items-center text-sm">
+                        <span className="text-gray-900">{keyword.keyword}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-gray-500 text-xs">
+                            Vol: {keyword.searchVolume || 'N/A'}
+                          </span>
+                          <span className="text-gray-500 text-xs">
+                            Diff: {keyword.difficulty || 'N/A'}
+                          </span>
+                          <button
+                            onClick={() => handleRemoveGSCKeyword(index)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -877,14 +867,17 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         {/* Footer */}
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 0}
-              icon={ArrowLeft}
-            >
-              Previous
-            </Button>
+            {currentStep > 0 ? (
+              <Button
+                variant="outline"
+                onClick={prevStep}
+                icon={ArrowLeft}
+              >
+                Previous
+              </Button>
+            ) : (
+              <div /> {/* Empty div for spacing */
+            )}
 
             <div className="flex space-x-3">
               {currentStep === STEPS.length - 1 ? (

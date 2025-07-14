@@ -135,8 +135,9 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
     return sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
   };
 
-  const formatNumber = (num?: number): string => {
+  const formatNumber = (num?: number, showZero: boolean = false): string => {
     if (num === undefined || num === null) return 'N/A';
+    if (num === 0 && !showZero) return '-';
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toString();
@@ -144,7 +145,14 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
 
   const formatDecimal = (num?: number, decimals: number = 1): string => {
     if (num === undefined || num === null) return 'N/A';
+    if (num === 0) return '-';
     return num.toFixed(decimals);
+  };
+
+  const formatCurrency = (num?: number): string => {
+    if (num === undefined || num === null) return 'N/A';
+    if (num === 0) return '-';
+    return `$${num.toFixed(2)}`;
   };
 
   const getDifficultyColor = (difficulty?: number): string => {
@@ -197,7 +205,7 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
       {/* Filters */}
       {showFilters && (
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div>
               <Input
                 placeholder="Search keywords..."
@@ -234,6 +242,22 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
             <div className="flex items-center space-x-2 text-sm text-gray-500">
               <Filter className="h-4 w-4" />
               <span>Filtered: {filteredAndSortedKeywords.length}</span>
+            </div>
+          </div>
+          
+          {/* Data Source Legend */}
+          <div className="flex items-center justify-center space-x-6 text-xs text-gray-500 pt-2 border-t border-gray-200">
+            <div className="flex items-center space-x-1">
+              <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+              <span>API = DataForSEO (Volume, Difficulty, CPC)</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span className="w-2 h-2 bg-green-600 rounded-full"></span>
+              <span>GSC = Google Search Console (Clicks, Position)</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+              <span>- = No data available</span>
             </div>
           </div>
         </div>
@@ -336,24 +360,49 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {formatNumber(keyword.searchVolume)}
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-gray-900">{formatNumber(keyword.searchVolume)}</span>
+                    {keyword.searchVolume && keyword.searchVolume > 0 && (
+                      <span className="text-xs text-blue-600" title="Data from DataForSEO">API</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={getDifficultyColor(keyword.difficulty)}>
-                    {keyword.difficulty ? `${keyword.difficulty}%` : 'N/A'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {keyword.cpc ? `$${formatDecimal(keyword.cpc, 2)}` : 'N/A'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {formatNumber(keyword.clicks)}
+                  <div className="flex items-center space-x-1">
+                    <span className={getDifficultyColor(keyword.difficulty)}>
+                      {keyword.difficulty && keyword.difficulty > 0 ? `${keyword.difficulty}%` : '-'}
+                    </span>
+                    {keyword.difficulty && keyword.difficulty > 0 && (
+                      <span className="text-xs text-blue-600" title="Data from DataForSEO">API</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={getPositionColor(keyword.position)}>
-                    {keyword.position ? formatDecimal(keyword.position) : 'N/A'}
-                  </span>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-gray-900">{formatCurrency(keyword.cpc)}</span>
+                    {keyword.cpc && keyword.cpc > 0 && (
+                      <span className="text-xs text-blue-600" title="Data from DataForSEO">API</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-gray-900">{formatNumber(keyword.clicks, true)}</span>
+                    {keyword.clicks && keyword.clicks > 0 && (
+                      <span className="text-xs text-green-600" title="Data from Google Search Console">GSC</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <div className="flex items-center space-x-1">
+                    <span className={getPositionColor(keyword.position)}>
+                      {formatDecimal(keyword.position)}
+                    </span>
+                    {keyword.position && keyword.position > 0 && (
+                      <span className="text-xs text-green-600" title="Data from Google Search Console">GSC</span>
+                    )}
+                  </div>
                 </td>
                 {onKeywordSelect && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm">

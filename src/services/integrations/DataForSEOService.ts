@@ -109,6 +109,15 @@ class DataForSEOService {
       });
       
       console.log('DataForSEO API response received:', response);
+      
+      // Log the actual structure of the first item to understand available fields
+      if (response && response.length > 0) {
+        console.log('First DataForSEO item structure:', {
+          availableFields: Object.keys(response[0]),
+          sampleData: response[0]
+        });
+      }
+      
       // Transform DataForSEO response to our format
       return this.transformKeywordData(response);
     } catch (error) {
@@ -323,19 +332,41 @@ class DataForSEOService {
   
   private transformKeywordData(response: any): KeywordData[] {
     if (!response || !Array.isArray(response)) {
+      console.warn('DataForSEO response is not an array:', response);
       return [];
     }
     
-    return response.map((item: any) => ({
-      keyword: item.keyword || '',
-      searchVolume: item.search_volume || 0,
-      difficulty: item.keyword_difficulty || 0,
-      cpc: item.cpc || 0,
-      competition: item.competition || 0,
-      trend: item.monthly_searches?.map((m: any) => m.search_volume) || [],
-      relatedKeywords: item.related_keywords || [],
-      intent: this.determineSearchIntent(item.keyword_annotations || {}),
-    }));
+    console.log('Transforming DataForSEO data:', {
+      itemCount: response.length,
+      firstItemKeys: response[0] ? Object.keys(response[0]) : 'none'
+    });
+    
+    return response.map((item: any, index: number) => {
+      // Log detailed field mapping for first few items
+      if (index < 2) {
+        console.log(`DataForSEO item ${index} field mapping:`, {
+          keyword: item.keyword || item.query || 'missing',
+          searchVolume: item.search_volume || item.volume || 'missing',
+          difficulty: item.keyword_difficulty || item.difficulty || 'missing',
+          cpc: item.cpc || item.average_cpc || 'missing',
+          competition: item.competition || item.competition_index || 'missing',
+          availableFields: Object.keys(item)
+        });
+      }
+      
+      const transformed = {
+        keyword: item.keyword || item.query || '',
+        searchVolume: item.search_volume || item.volume || 0,
+        difficulty: item.keyword_difficulty || item.difficulty || 0,
+        cpc: item.cpc || item.average_cpc || 0,
+        competition: item.competition || item.competition_index || 0,
+        trend: item.monthly_searches?.map((m: any) => m.search_volume) || [],
+        relatedKeywords: item.related_keywords || [],
+        intent: this.determineSearchIntent(item.keyword_annotations || {}),
+      };
+      
+      return transformed;
+    });
   }
   
   private transformSERPData(response: any, keyword: string): SERPAnalysis {

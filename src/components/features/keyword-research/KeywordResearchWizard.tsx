@@ -21,6 +21,7 @@ import { useAppStore } from '../../../store/appStore';
 import { supabase } from '../../../lib/supabase';
 import GoogleOAuthService from '../../../services/integrations/GoogleOAuthService';
 import DataForSEOService from '../../../services/integrations/DataForSEOService';
+import { KeywordResultsTable } from './KeywordResultsTable';
 
 interface WizardStep {
   id: string;
@@ -181,6 +182,26 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         await GoogleOAuthService.initiateOAuth();
       }
 
+      // Load client brand terms for filtering
+      let brandTerms: { term: string; isRegex: boolean }[] = [];
+      if (selectedClient?.id) {
+        try {
+          const { data: brandData, error: brandError } = await supabase
+            .from('client_brand_terms')
+            .select('term, is_regex')
+            .eq('client_id', selectedClient.id);
+          
+          if (brandError) {
+            console.warn('Error loading brand terms:', brandError);
+          } else {
+            brandTerms = brandData?.map(bt => ({ term: bt.term, isRegex: bt.is_regex })) || [];
+            console.log('Loaded brand terms for filtering:', brandTerms);
+          }
+        } catch (error) {
+          console.warn('Failed to load brand terms:', error);
+        }
+      }
+
       // Get the client's assigned GSC property or auto-detect the best one
       let clientGSCProperty: string | undefined;
       
@@ -248,7 +269,38 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         position: gscKeyword.position
       }));
 
-      setGscKeywords(transformedKeywords);
+      // Filter out brand keywords
+      const filteredKeywords = transformedKeywords.filter(keyword => {
+        const keywordLower = keyword.keyword.toLowerCase();
+        
+        for (const brandTerm of brandTerms) {
+          if (brandTerm.isRegex) {
+            try {
+              const regex = new RegExp(brandTerm.term, 'i');
+              if (regex.test(keyword.keyword)) {
+                console.log(`Filtered brand keyword (regex): ${keyword.keyword} matches ${brandTerm.term}`);
+                return false;
+              }
+            } catch (error) {
+              console.warn(`Invalid regex pattern: ${brandTerm.term}`, error);
+              // Fallback to simple string match
+              if (keywordLower.includes(brandTerm.term.toLowerCase())) {
+                console.log(`Filtered brand keyword (fallback): ${keyword.keyword} contains ${brandTerm.term}`);
+                return false;
+              }
+            }
+          } else {
+            if (keywordLower.includes(brandTerm.term.toLowerCase())) {
+              console.log(`Filtered brand keyword: ${keyword.keyword} contains ${brandTerm.term}`);
+              return false;
+            }
+          }
+        }
+        return true;
+      });
+
+      console.log(`Brand filtering: ${transformedKeywords.length} → ${filteredKeywords.length} keywords (${transformedKeywords.length - filteredKeywords.length} branded filtered)`);
+      setGscKeywords(filteredKeywords);
     } catch (error) {
       console.error('Error loading GSC keywords:', error);
       
@@ -764,25 +816,14 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-md p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Preview of Discovered Keywords</h4>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {discoveredKeywords.slice(0, 10).map((keyword, index) => (
-                      <div key={index} className="flex justify-between text-sm">
-                        <span className="text-gray-900">{keyword.keyword}</span>
-                        <span className="text-gray-500">
-                          Vol: {keyword.searchVolume || 'N/A'} | 
-                          Diff: {keyword.difficulty || 'N/A'} | 
-                          {keyword.source}
-                        </span>
-                      </div>
-                    ))}
-                    {discoveredKeywords.length > 10 && (
-                      <div className="text-sm text-gray-500 text-center pt-2">
-                        + {discoveredKeywords.length - 10} more keywords
-                      </div>
-                    )}
-                  </div>
+                {/* Full Results Table */}
+                <div className="mt-6">
+                  <KeywordResultsTable 
+                    keywords={discoveredKeywords}
+                    title="Discovered Keywords"
+                    showFilters={true}
+                    showExport={false}
+                  />
                 </div>
               </div>
             ) : (

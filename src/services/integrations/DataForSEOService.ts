@@ -320,14 +320,24 @@ class DataForSEOService {
     console.log('DataForSEO API response data:', {
       statusCode: result.status_code,
       statusMessage: result.status_message,
-      tasksLength: result.tasks?.length
+      tasksLength: result.tasks?.length,
+      fullResponse: result
     });
     
     if (result.status_code !== 20000) {
       throw new Error(`DataForSEO API error: ${result.status_message}`);
     }
     
-    return result.tasks?.[0]?.result || result.data || result;
+    // Extract the actual data array from the response structure
+    const extractedData = result.tasks?.[0]?.result || result.data || result;
+    console.log('Extracted DataForSEO data:', {
+      dataType: Array.isArray(extractedData) ? 'array' : typeof extractedData,
+      dataLength: Array.isArray(extractedData) ? extractedData.length : 'not array',
+      firstItem: Array.isArray(extractedData) && extractedData.length > 0 ? extractedData[0] : 'no data',
+      dataStructure: extractedData
+    });
+    
+    return extractedData;
   }
   
   private transformKeywordData(response: any): KeywordData[] {

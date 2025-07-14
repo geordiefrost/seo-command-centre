@@ -26,16 +26,16 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: Home },
-  { name: 'Clients', href: '/clients', icon: UserCheck },
-  { name: 'Strategy', href: '/strategy', icon: Target },
-  { name: 'Keyword Research', href: '/keyword-research', icon: Search },
-  { name: 'Content', href: '/content', icon: PenTool },
-  { name: 'Migration', href: '/migration', icon: ArrowRightLeft },
-  { name: 'Monitoring', href: '/monitoring', icon: Shield },
-  { name: 'Competitive', href: '/competitive', icon: Users },
-  { name: 'Automation', href: '/automation', icon: Zap },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'Clients', href: '/clients', icon: UserCheck, enabled: true },
+  { name: 'Keyword Research', href: '/keyword-research', icon: Search, enabled: true },
+  { name: 'Dashboard', href: '/', icon: Home, enabled: false },
+  { name: 'Strategy', href: '/strategy', icon: Target, enabled: false },
+  { name: 'Content', href: '/content', icon: PenTool, enabled: false },
+  { name: 'Migration', href: '/migration', icon: ArrowRightLeft, enabled: false },
+  { name: 'Monitoring', href: '/monitoring', icon: Shield, enabled: false },
+  { name: 'Competitive', href: '/competitive', icon: Users, enabled: false },
+  { name: 'Automation', href: '/automation', icon: Zap, enabled: false },
+  { name: 'Reports', href: '/reports', icon: BarChart3, enabled: false },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
@@ -76,26 +76,41 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           return (
             <NavLink
               key={item.name}
-              to={item.href}
+              to={item.enabled ? item.href : '#'}
               className={({ isActive }) =>
                 cn(
                   'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                  isActive
+                  !item.enabled
+                    ? 'text-gray-500 cursor-not-allowed opacity-50'
+                    : isActive
                     ? 'bg-primary-600 text-white'
                     : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                 )
               }
-              onClick={() => {
+              onClick={(e) => {
+                if (!item.enabled) {
+                  e.preventDefault();
+                  return;
+                }
                 if (window.innerWidth < 1024) {
                   onClose();
                 }
               }}
             >
               <item.icon className="h-5 w-5" />
-              {!sidebarCollapsed && <span>{item.name}</span>}
+              {!sidebarCollapsed && (
+                <span className="flex items-center justify-between w-full">
+                  {item.name}
+                  {!item.enabled && (
+                    <span className="text-xs bg-gray-700 text-gray-400 px-2 py-0.5 rounded">
+                      Soon
+                    </span>
+                  )}
+                </span>
+              )}
             </NavLink>
           );
-        })}
+        })
       </nav>
       
       {/* Integration Status */}

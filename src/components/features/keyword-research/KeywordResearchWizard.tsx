@@ -88,7 +88,7 @@ const STEPS: WizardStep[] = [
 
 interface KeywordResearchWizardProps {
   clientId: string;
-  onComplete: () => void;
+  onComplete: (savedProject: any) => void;
   onCancel: () => void;
   editingProject?: any;
 }
@@ -364,8 +364,36 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         intent: k.intent
       })));
 
-      // Add GSC keywords
-      allKeywords.push(...gscKeywords);
+      // Enrich GSC keywords with DataForSEO data
+      if (gscKeywords.length > 0) {
+        setProcessingStatus('Enriching GSC keywords with volume and difficulty data...');
+        try {
+          const gscKeywordStrings = gscKeywords.map(k => k.keyword);
+          const enrichedGSCData = await DataForSEOService.getKeywordData(gscKeywordStrings);
+          
+          // Merge GSC performance data with DataForSEO volume/difficulty data
+          const mergedGSCKeywords = gscKeywords.map(gscKeyword => {
+            const dataForSEOData = enrichedGSCData.find(d => 
+              d.keyword.toLowerCase() === gscKeyword.keyword.toLowerCase()
+            );
+            
+            return {
+              ...gscKeyword,
+              searchVolume: dataForSEOData?.searchVolume || gscKeyword.searchVolume,
+              difficulty: dataForSEOData?.difficulty || gscKeyword.difficulty,
+              cpc: dataForSEOData?.cpc || gscKeyword.cpc,
+              competition: dataForSEOData?.competition || gscKeyword.competition,
+              intent: dataForSEOData?.intent || gscKeyword.intent
+            };
+          });
+          
+          allKeywords.push(...mergedGSCKeywords);
+        } catch (error) {
+          console.warn('Failed to enrich GSC keywords with DataForSEO data:', error);
+          // Fallback to original GSC keywords without enrichment
+          allKeywords.push(...gscKeywords);
+        }
+      }
 
       // Process competitor keywords
       for (const competitor of selectedCompetitors) {
@@ -515,7 +543,25 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           .insert(keywordInserts);
       }
 
-      onComplete();
+      // Create saved project object with all necessary data
+      const savedProject = {
+        id: projectId,
+        clientId,
+        name: projectData.name,
+        description: projectData.description,
+        status: 'completed',
+        assignedTo: user?.email || null,
+        settings: {
+          seedKeywords,
+          selectedCompetitors,
+          gscImported: gscKeywords.length > 0
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        keywordCount: discoveredKeywords.length
+      };
+
+      onComplete(savedProject);
     } catch (error) {
       console.error('Error saving project:', error);
       alert('Failed to save project. Please try again.');

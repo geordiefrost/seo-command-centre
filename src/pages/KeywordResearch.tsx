@@ -177,10 +177,12 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
       <div className="p-6">
         <KeywordResearchWizard
           clientId={selectedClientId!}
-          onComplete={() => {
+          onComplete={async (savedProject) => {
             setShowWizard(false);
             setEditingProject(null);
-            loadProjects();
+            
+            // Automatically navigate to the results view
+            await handleViewProject(savedProject);
           }}
           onCancel={() => {
             setShowWizard(false);

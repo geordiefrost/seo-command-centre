@@ -576,11 +576,11 @@ class GoogleOAuthService {
       siteUrl = properties[0].siteUrl;
     }
 
-    // Default date range: last 90 days
+    // Default date range: last 12 months (365 days)
     if (!startDate || !endDate) {
       const end = new Date();
       const start = new Date();
-      start.setDate(end.getDate() - 90);
+      start.setDate(end.getDate() - 365);
       
       endDate = end.toISOString().split('T')[0];
       startDate = start.toISOString().split('T')[0];

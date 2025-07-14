@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu, Bell, Search, User, Settings, LogOut } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import { Button, Input, Badge, ClientSelector } from '../common';
 import { cn } from '../../lib/utils';
@@ -12,6 +13,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { user, notifications, isAuthenticated, setUser, setAuthenticated } = useAppStore();
+  const navigate = useNavigate();
   
   const unreadNotifications = notifications.filter(n => !n.read).length;
   
@@ -134,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
         ) : (
-          <Button size="sm">
+          <Button size="sm" onClick={() => navigate('/login')}>
             Sign In
           </Button>
         )}

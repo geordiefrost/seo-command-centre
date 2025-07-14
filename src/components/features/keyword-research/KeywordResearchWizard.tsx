@@ -174,6 +174,18 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
     setGscKeywords(gscKeywords.filter((_, i) => i !== index));
   };
 
+  const handleTestDataForSEO = async () => {
+    console.log('Testing DataForSEO credentials...');
+    try {
+      const result = await DataForSEOService.testCredentials();
+      console.log('DataForSEO test result:', result);
+      alert(`DataForSEO Test: ${result.success ? 'SUCCESS' : 'FAILED'}\n${result.message}`);
+    } catch (error) {
+      console.error('DataForSEO test error:', error);
+      alert(`DataForSEO Test Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const handleLoadGSCKeywords = async () => {
     setIsLoadingGSC(true);
     try {
@@ -181,8 +193,28 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         await GoogleOAuthService.initiateOAuth();
       }
 
-      // Get real GSC keyword data
-      const gscData = await GoogleOAuthService.getSearchConsoleKeywords();
+      // Get the client's assigned GSC property
+      let clientGSCProperty: string | undefined;
+      if (selectedClient?.searchConsolePropertyId) {
+        clientGSCProperty = selectedClient.searchConsolePropertyId;
+        console.log('Using client assigned GSC property:', clientGSCProperty);
+      } else {
+        console.warn('No GSC property assigned to client, using first available property');
+      }
+
+      // Get real GSC keyword data using client's specific property
+      const gscData = await GoogleOAuthService.getSearchConsoleKeywords(
+        clientGSCProperty, // Use client's specific property
+        undefined, // startDate - use default (90 days ago)
+        undefined, // endDate - use default (today)
+        25 // rowLimit
+      );
+      
+      console.log('GSC keyword data received:', {
+        keywordCount: gscData.length,
+        propertyUsed: clientGSCProperty || 'first_available',
+        clientName: selectedClient?.name
+      });
       
       // Transform GSC data to our KeywordData format
       const transformedKeywords: KeywordData[] = gscData.map(gscKeyword => ({
@@ -478,6 +510,24 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                 className="w-full p-3 border border-gray-300 rounded-md resize-none"
                 rows={3}
               />
+            </div>
+
+            {/* Temporary debug section */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Debug Tools</h4>
+              <div className="space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestDataForSEO}
+                  className="text-xs"
+                >
+                  Test DataForSEO
+                </Button>
+                <span className="text-xs text-gray-500">
+                  Client GSC Property: {selectedClient?.searchConsolePropertyId || 'Not assigned'}
+                </span>
+              </div>
             </div>
 
           </div>

@@ -20,6 +20,59 @@ class DataForSEOService {
       baseURL: this.baseURL
     });
   }
+
+  /**
+   * Test DataForSEO credentials with a simple API call
+   */
+  async testCredentials(): Promise<{ success: boolean; message: string; details?: any }> {
+    if (!this.hasCredentials()) {
+      return {
+        success: false,
+        message: 'DataForSEO credentials not configured'
+      };
+    }
+
+    try {
+      console.log('Testing DataForSEO credentials...');
+      
+      // Use a simple endpoint to test credentials
+      const response = await fetch(`${this.baseURL}/user`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${btoa(`${this.apiLogin}:${this.apiPassword}`)}`,
+        },
+      });
+
+      const result = await response.json();
+      
+      console.log('Credential test response:', {
+        status: response.status,
+        statusText: response.statusText,
+        result
+      });
+
+      if (response.ok && result.status_code === 20000) {
+        return {
+          success: true,
+          message: 'DataForSEO credentials are valid',
+          details: result
+        };
+      } else {
+        return {
+          success: false,
+          message: `DataForSEO credential test failed: ${result.status_message || response.statusText}`,
+          details: result
+        };
+      }
+    } catch (error) {
+      console.error('DataForSEO credential test error:', error);
+      return {
+        success: false,
+        message: `DataForSEO credential test error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        details: error
+      };
+    }
+  }
   
   async getKeywordData(keywords: string[]): Promise<KeywordData[]> {
     console.log('getKeywordData called:', {
@@ -208,18 +261,33 @@ class DataForSEOService {
     const payload = Array.isArray(data) ? data : [data];
     const url = `${this.baseURL}${endpoint}`;
     
+    // Create authorization header
+    const authString = `${this.apiLogin}:${this.apiPassword}`;
+    const encodedAuth = btoa(authString);
+    
     console.log('Making DataForSEO API request:', {
       url,
       payloadLength: payload.length,
-      firstTask: payload[0]
+      firstTask: payload[0],
+      authStringLength: authString.length,
+      encodedAuthLength: encodedAuth.length,
+      loginLength: this.apiLogin.length,
+      passwordLength: this.apiPassword.length
+    });
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Basic ${encodedAuth}`,
+    };
+    
+    console.log('Request headers (without full auth):', {
+      'Content-Type': headers['Content-Type'],
+      'Authorization': `Basic [${encodedAuth.length} chars]`
     });
     
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${btoa(`${this.apiLogin}:${this.apiPassword}`)}`,
-      },
+      headers,
       body: JSON.stringify(payload),
     });
     

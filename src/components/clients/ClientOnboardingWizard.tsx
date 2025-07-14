@@ -167,12 +167,29 @@ export const ClientOnboardingWizard: React.FC<ClientOnboardingWizardProps> = ({
         setIsGoogleAuthenticated(true);
       }
       
-      const gscProperty = await GoogleOAuthService.findPropertyForDomain(formData.domain);
-      if (gscProperty) {
-        updateFormData('searchConsolePropertyId', gscProperty);
+      // Use the new detectPrimaryProperty method for better property detection
+      const detectionResult = await GoogleOAuthService.detectPrimaryProperty(formData.domain);
+      
+      if (detectionResult.primaryProperty) {
+        updateFormData('searchConsolePropertyId', detectionResult.primaryProperty);
         setGscLookupStatus('found');
+        
+        console.log('GSC Property Auto-Detection Success:', {
+          domain: formData.domain,
+          selectedProperty: detectionResult.primaryProperty,
+          recommendedFormat: detectionResult.recommendedFormat,
+          totalMatches: detectionResult.allMatches.length
+        });
+        
+        // If multiple properties were found, show them in console for debugging
+        if (detectionResult.allMatches.length > 1) {
+          console.log('Multiple GSC properties found for domain:', 
+            detectionResult.allMatches.map(p => p.siteUrl)
+          );
+        }
       } else {
         setGscLookupStatus('not-found');
+        console.log('No GSC properties found for domain:', formData.domain);
       }
     } catch (error) {
       console.error('GSC property lookup failed:', error);

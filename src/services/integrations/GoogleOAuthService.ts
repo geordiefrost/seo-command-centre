@@ -72,8 +72,9 @@ class GoogleOAuthService {
       authUrl.searchParams.set('redirect_uri', this.config.redirectUri);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('scope', this.config.scopes.join(' '));
-      authUrl.searchParams.set('access_type', 'offline');
-      authUrl.searchParams.set('prompt', 'consent');
+      authUrl.searchParams.set('access_type', 'offline'); // Required for refresh tokens
+      authUrl.searchParams.set('prompt', 'consent'); // Force consent to get refresh token
+      authUrl.searchParams.set('approval_prompt', 'force'); // Legacy support
       authUrl.searchParams.set('state', 'search-console-auth');
 
       console.log('Initiating Google OAuth flow:', {
@@ -167,11 +168,29 @@ class GoogleOAuthService {
 
     const tokens = await response.json();
     
+    console.log('OAuth tokens received:', {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      expiresIn: tokens.expires_in,
+      tokenType: tokens.token_type
+    });
+    
     // Store tokens in localStorage
     localStorage.setItem('google_access_token', tokens.access_token);
+    
     if (tokens.refresh_token) {
       localStorage.setItem('google_refresh_token', tokens.refresh_token);
+      console.log('Refresh token stored successfully');
+    } else {
+      console.warn('No refresh token received - user may need to re-authenticate more frequently');
     }
+
+    // Store expiration time (default 1 hour if not provided)
+    const expiresIn = tokens.expires_in || 3600; // Default to 1 hour
+    const expiresAt = Date.now() + (expiresIn * 1000);
+    localStorage.setItem('google_token_expires_at', expiresAt.toString());
+    
+    console.log('Token will expire at:', new Date(expiresAt).toISOString());
 
     return tokens;
   }
@@ -183,6 +202,9 @@ class GoogleOAuthService {
     if (this.useMockData) {
       return this.getMockProperties();
     }
+
+    // Ensure we have a valid token before making API calls
+    await this.ensureValidToken();
 
     const accessToken = this.getStoredAccessToken();
     if (!accessToken) {
@@ -257,6 +279,9 @@ class GoogleOAuthService {
    */
   async findPropertyForDomain(domain: string): Promise<string | null> {
     try {
+      // Ensure we have a valid token before making API calls
+      await this.ensureValidToken();
+      
       const properties = await this.getSearchConsoleProperties();
       
       // Try to find exact match first
@@ -288,6 +313,117 @@ class GoogleOAuthService {
   }
 
   /**
+   * Detect and normalize GSC property format
+   * Returns the best-matching property format for a given domain
+   */
+  async detectPrimaryProperty(domain: string): Promise<{
+    primaryProperty: string | null;
+    allMatches: SearchConsoleProperty[];
+    recommendedFormat: 'domain' | 'url' | 'sc-domain';
+  }> {
+    try {
+      // Ensure we have a valid token before making API calls
+      await this.ensureValidToken();
+      
+      const properties = await this.getSearchConsoleProperties();
+      
+      // Clean domain input
+      const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./, '');
+      
+      // Find all matching properties for this domain
+      const allMatches = properties.filter(prop => {
+        const siteUrl = prop.siteUrl.toLowerCase();
+        
+        // Check for domain-based matches
+        if (siteUrl.includes(cleanDomain.toLowerCase())) {
+          return true;
+        }
+        
+        // Check for www variant matches
+        if (siteUrl.includes(`www.${cleanDomain.toLowerCase()}`)) {
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (allMatches.length === 0) {
+        return {
+          primaryProperty: null,
+          allMatches: [],
+          recommendedFormat: 'domain'
+        };
+      }
+      
+      // Prioritize property types by data completeness
+      // 1. sc-domain (usually has the most complete data)
+      // 2. https://domain/ (verified site)
+      // 3. https://www.domain/ (www variant)
+      // 4. http://domain/ (less secure)
+      
+      let primaryProperty: SearchConsoleProperty | null = null;
+      let recommendedFormat: 'domain' | 'url' | 'sc-domain' = 'domain';
+      
+      // Check for sc-domain first (most comprehensive)
+      const scDomainProperty = allMatches.find(prop => 
+        prop.siteUrl.startsWith('sc-domain:')
+      );
+      
+      if (scDomainProperty) {
+        primaryProperty = scDomainProperty;
+        recommendedFormat = 'sc-domain';
+      } else {
+        // Check for HTTPS properties next
+        const httpsProperty = allMatches.find(prop => 
+          prop.siteUrl.startsWith('https://') && 
+          !prop.siteUrl.includes('www.')
+        );
+        
+        if (httpsProperty) {
+          primaryProperty = httpsProperty;
+          recommendedFormat = 'url';
+        } else {
+          // Check for HTTPS www variant
+          const httpsWwwProperty = allMatches.find(prop => 
+            prop.siteUrl.startsWith('https://www.')
+          );
+          
+          if (httpsWwwProperty) {
+            primaryProperty = httpsWwwProperty;
+            recommendedFormat = 'url';
+          } else {
+            // Fallback to any available property
+            primaryProperty = allMatches[0];
+            recommendedFormat = primaryProperty.siteUrl.startsWith('sc-domain:') ? 'sc-domain' : 'url';
+          }
+        }
+      }
+      
+      console.log('GSC Property Detection Results:', {
+        domain: cleanDomain,
+        totalMatches: allMatches.length,
+        primaryProperty: primaryProperty?.siteUrl,
+        recommendedFormat,
+        allProperties: allMatches.map(p => p.siteUrl)
+      });
+      
+      return {
+        primaryProperty: primaryProperty?.siteUrl || null,
+        allMatches,
+        recommendedFormat
+      };
+      
+    } catch (error) {
+      console.error('Error detecting GSC property format:', error);
+      return {
+        primaryProperty: null,
+        allMatches: [],
+        recommendedFormat: 'domain'
+      };
+    }
+  }
+
+  /**
    * Get keyword performance data from Google Search Console
    */
   async getSearchConsoleKeywords(
@@ -299,6 +435,9 @@ class GoogleOAuthService {
     if (this.useMockData) {
       return this.getMockGSCKeywords();
     }
+
+    // Ensure we have a valid token before making API calls
+    await this.ensureValidToken();
 
     const accessToken = this.getStoredAccessToken();
     if (!accessToken) {
@@ -354,8 +493,53 @@ class GoogleOAuthService {
         });
         
         if (response.status === 401) {
+          // Try to refresh token
+          try {
+            console.log('Attempting to refresh access token for GSC Search Analytics...');
+            await this.refreshAccessToken();
+            
+            // Retry the request with new token
+            const newToken = this.getStoredAccessToken();
+            if (newToken) {
+              const retryResponse = await fetch(
+                `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${newToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    startDate,
+                    endDate,
+                    dimensions: ['query'],
+                    rowLimit,
+                    startRow: 0
+                  }),
+                }
+              );
+              
+              if (retryResponse.ok) {
+                const retryData = await retryResponse.json();
+                // Transform GSC data to our format
+                return (retryData.rows || []).map((row: any) => ({
+                  keyword: row.keys[0],
+                  clicks: Math.round(row.clicks || 0),
+                  impressions: Math.round(row.impressions || 0),
+                  ctr: Math.round((row.ctr || 0) * 100 * 100) / 100, // Convert to percentage with 2 decimals
+                  position: Math.round((row.position || 0) * 10) / 10, // Round to 1 decimal
+                  source: 'gsc' as const,
+                  intent: this.determineSearchIntent(row.keys[0])
+                }));
+              }
+            }
+          } catch (refreshError) {
+            console.error('Token refresh failed for GSC Search Analytics:', refreshError);
+          }
+          
+          // Token refresh failed, clear tokens and require re-auth
           this.signOut();
-          throw new Error('Access token expired. Please re-authenticate with Google.');
+          throw new Error('Access token expired and refresh failed. Please re-authenticate with Google.');
         }
         
         throw new Error(`GSC Search Analytics API Error (${response.status}): ${response.statusText}`);
@@ -420,12 +604,81 @@ class GoogleOAuthService {
     // Check if token is expired
     const expiresAt = localStorage.getItem('google_token_expires_at');
     if (expiresAt && Date.now() > parseInt(expiresAt)) {
-      // Token expired, clear it
-      this.signOut();
-      return false;
+      // Token expired, but we might be able to refresh if we have a refresh token
+      const hasRefreshToken = !!localStorage.getItem('google_refresh_token');
+      if (hasRefreshToken) {
+        console.log('Access token expired, but refresh token available');
+        return true; // Still consider authenticated if we have a refresh token
+      } else {
+        console.log('Access token expired and no refresh token available');
+        return false;
+      }
     }
     
     return true;
+  }
+
+  /**
+   * Get authentication status details
+   */
+  getAuthenticationStatus(): {
+    isAuthenticated: boolean;
+    hasAccessToken: boolean;
+    hasRefreshToken: boolean;
+    tokenExpired: boolean;
+    expiresAt: Date | null;
+    timeUntilExpiry: number | null;
+  } {
+    const accessToken = this.getStoredAccessToken();
+    const refreshToken = localStorage.getItem('google_refresh_token');
+    const expiresAtStr = localStorage.getItem('google_token_expires_at');
+    
+    const expiresAt = expiresAtStr ? new Date(parseInt(expiresAtStr)) : null;
+    const tokenExpired = expiresAt ? Date.now() > expiresAt.getTime() : false;
+    const timeUntilExpiry = expiresAt ? expiresAt.getTime() - Date.now() : null;
+    
+    return {
+      isAuthenticated: this.isAuthenticated(),
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      tokenExpired,
+      expiresAt,
+      timeUntilExpiry
+    };
+  }
+
+  /**
+   * Check if token is expiring soon (within 5 minutes)
+   */
+  private isTokenExpiring(): boolean {
+    const expiresAt = localStorage.getItem('google_token_expires_at');
+    if (!expiresAt) return true; // No expiry info, assume expiring
+    
+    const expirationTime = parseInt(expiresAt);
+    const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const isExpiring = Date.now() > (expirationTime - fiveMinutes);
+    
+    if (isExpiring) {
+      console.log('Token expiring soon, will refresh proactively');
+    }
+    
+    return isExpiring;
+  }
+
+  /**
+   * Ensure we have a valid, non-expiring token
+   */
+  private async ensureValidToken(): Promise<void> {
+    const hasRefreshToken = !!localStorage.getItem('google_refresh_token');
+    
+    if (!hasRefreshToken) {
+      throw new Error('No refresh token available. Please re-authenticate with Google.');
+    }
+
+    if (this.isTokenExpiring()) {
+      console.log('Proactively refreshing token before API call');
+      await this.refreshAccessToken();
+    }
   }
 
   /**

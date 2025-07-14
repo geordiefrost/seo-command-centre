@@ -14,7 +14,7 @@ import {
 import { Card, Button, Badge } from '../components/common';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '../lib/supabase';
-import { KeywordResearchWizard } from '../components/features/keyword-research/KeywordResearchWizard';
+import { KeywordResearchWizard, KeywordResultsTable } from '../components/features/keyword-research';
 
 interface KeywordResearchProject {
   id: string;
@@ -41,6 +41,7 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
   const [selectedProject, setSelectedProject] = useState<KeywordResearchProject | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [editingProject, setEditingProject] = useState<KeywordResearchProject | null>(null);
+  const [projectKeywords, setProjectKeywords] = useState<any[]>([]);
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
@@ -96,9 +97,39 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
     setShowWizard(true);
   };
 
-  const handleViewProject = (project: KeywordResearchProject) => {
+  const handleViewProject = async (project: KeywordResearchProject) => {
     setSelectedProject(project);
     setShowResults(true);
+    
+    // Load keywords for this project
+    try {
+      const { data: keywords, error } = await supabase
+        .from('keywords')
+        .select('*')
+        .eq('project_id', project.id)
+        .order('search_volume', { ascending: false, nullsFirst: false });
+      
+      if (error) throw error;
+      
+      // Transform database keywords to KeywordData format
+      const transformedKeywords = (keywords || []).map(keyword => ({
+        keyword: keyword.keyword,
+        searchVolume: keyword.search_volume || undefined,
+        difficulty: keyword.difficulty || undefined,
+        source: keyword.source || 'manual',
+        competition: keyword.competition_level ? keyword.competition_level / 100 : undefined,
+        intent: keyword.search_intent || undefined,
+        clicks: undefined, // These would come from separate GSC data
+        impressions: undefined,
+        ctr: undefined,
+        position: undefined
+      }));
+      
+      setProjectKeywords(transformedKeywords);
+    } catch (error) {
+      console.error('Error loading project keywords:', error);
+      setProjectKeywords([]);
+    }
   };
 
   const handleEditProject = (project: KeywordResearchProject) => {
@@ -164,7 +195,6 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
   if (showResults && selectedProject) {
     return (
       <div className="p-6">
-        {/* TODO: Implement KeywordResultsTable */}
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <Button 
@@ -178,13 +208,59 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
             <p className="text-gray-600">{selectedProject.description}</p>
           </div>
           
-          <Card className="p-8 text-center">
-            <h2 className="text-xl font-semibold mb-4">Keyword Results</h2>
-            <p className="text-gray-600 mb-6">Results table component coming soon...</p>
-            <div className="text-sm text-gray-500">
-              Keywords found: {selectedProject.keywordCount || 0}
-            </div>
-          </Card>
+          {/* Project Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card className="p-4">
+              <div className="flex items-center">
+                <BarChart3 className="h-8 w-8 text-blue-600 mr-3" />
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">{projectKeywords.length}</div>
+                  <div className="text-sm text-gray-600">Total Keywords</div>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center">
+                <Target className="h-8 w-8 text-green-600 mr-3" />
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {projectKeywords.filter(k => k.intent === 'commercial').length}
+                  </div>
+                  <div className="text-sm text-gray-600">Commercial</div>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center">
+                <Search className="h-8 w-8 text-purple-600 mr-3" />
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {projectKeywords.filter(k => k.intent === 'informational').length}
+                  </div>
+                  <div className="text-sm text-gray-600">Informational</div>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center">
+                <ArrowRight className="h-8 w-8 text-orange-600 mr-3" />
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {projectKeywords.filter(k => (k.searchVolume || 0) > 100 && (k.difficulty || 0) < 30).length}
+                  </div>
+                  <div className="text-sm text-gray-600">Quick Wins</div>
+                </div>
+              </div>
+            </Card>
+          </div>
+          
+          {/* Keywords Table */}
+          <KeywordResultsTable 
+            keywords={projectKeywords}
+            title={`Keywords for ${selectedProject.name}`}
+            showFilters={true}
+            showExport={false}
+          />
         </div>
       </div>
     );

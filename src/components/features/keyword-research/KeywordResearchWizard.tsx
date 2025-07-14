@@ -181,13 +181,28 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         await GoogleOAuthService.initiateOAuth();
       }
 
-      // Get the client's assigned GSC property
+      // Get the client's assigned GSC property or auto-detect the best one
       let clientGSCProperty: string | undefined;
       if (selectedClient?.searchConsolePropertyId) {
         clientGSCProperty = selectedClient.searchConsolePropertyId;
         console.log('Using client assigned GSC property:', clientGSCProperty);
+      } else if (selectedClient?.domain) {
+        console.log('No GSC property assigned, attempting auto-detection for domain:', selectedClient.domain);
+        
+        // Use auto-detection to find the best property for this client's domain
+        const detectionResult = await GoogleOAuthService.detectPrimaryProperty(selectedClient.domain);
+        if (detectionResult.primaryProperty) {
+          clientGSCProperty = detectionResult.primaryProperty;
+          console.log('Auto-detected GSC property:', {
+            selectedProperty: clientGSCProperty,
+            recommendedFormat: detectionResult.recommendedFormat,
+            totalMatches: detectionResult.allMatches.length
+          });
+        } else {
+          console.warn('No GSC property found for client domain:', selectedClient.domain);
+        }
       } else {
-        console.warn('No GSC property assigned to client, using first available property');
+        console.warn('No GSC property assigned and no domain available, using first available property');
       }
 
       // Get real GSC keyword data using client's specific property

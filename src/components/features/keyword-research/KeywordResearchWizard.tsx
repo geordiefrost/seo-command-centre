@@ -45,6 +45,11 @@ interface KeywordData {
   competition?: number;
   cpc?: number;
   intent?: 'informational' | 'navigational' | 'transactional' | 'commercial';
+  // GSC specific fields
+  clicks?: number;
+  impressions?: number;
+  ctr?: number;
+  position?: number;
 }
 
 const STEPS: WizardStep[] = [
@@ -176,19 +181,32 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         await GoogleOAuthService.initiateOAuth();
       }
 
-      // Mock GSC keyword loading for now
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Get real GSC keyword data
+      const gscData = await GoogleOAuthService.getSearchConsoleKeywords();
       
-      const mockGSCKeywords: KeywordData[] = [
-        { keyword: 'brand name', searchVolume: 1200, difficulty: 20, source: 'gsc', intent: 'navigational' },
-        { keyword: 'product category', searchVolume: 800, difficulty: 45, source: 'gsc', intent: 'commercial' },
-        { keyword: 'how to guide', searchVolume: 600, difficulty: 35, source: 'gsc', intent: 'informational' }
-      ];
+      // Transform GSC data to our KeywordData format
+      const transformedKeywords: KeywordData[] = gscData.map(gscKeyword => ({
+        keyword: gscKeyword.keyword,
+        searchVolume: undefined, // GSC doesn't provide search volume
+        difficulty: undefined, // GSC doesn't provide difficulty
+        source: 'gsc' as const,
+        competition: undefined,
+        cpc: undefined,
+        intent: gscKeyword.intent,
+        // Additional GSC specific data
+        clicks: gscKeyword.clicks,
+        impressions: gscKeyword.impressions,
+        ctr: gscKeyword.ctr,
+        position: gscKeyword.position
+      }));
 
-      setGscKeywords(mockGSCKeywords);
+      setGscKeywords(transformedKeywords);
     } catch (error) {
       console.error('Error loading GSC keywords:', error);
-      alert('Failed to load GSC keywords. Please try again.');
+      
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load GSC keywords';
+      alert(`GSC Import Error: ${errorMessage}`);
     } finally {
       setIsLoadingGSC(false);
     }
@@ -529,12 +547,21 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                       <div key={index} className="flex justify-between items-center text-sm">
                         <span className="text-gray-900">{keyword.keyword}</span>
                         <div className="flex items-center space-x-2">
-                          <span className="text-gray-500 text-xs">
-                            Vol: {keyword.searchVolume || 'N/A'}
-                          </span>
-                          <span className="text-gray-500 text-xs">
-                            Diff: {keyword.difficulty || 'N/A'}
-                          </span>
+                          {keyword.clicks !== undefined && (
+                            <span className="text-gray-500 text-xs">
+                              Clicks: {keyword.clicks}
+                            </span>
+                          )}
+                          {keyword.position !== undefined && (
+                            <span className="text-gray-500 text-xs">
+                              Pos: {keyword.position}
+                            </span>
+                          )}
+                          {keyword.ctr !== undefined && (
+                            <span className="text-gray-500 text-xs">
+                              CTR: {keyword.ctr}%
+                            </span>
+                          )}
                           <button
                             onClick={() => handleRemoveGSCKeyword(index)}
                             className="text-red-600 hover:text-red-800"

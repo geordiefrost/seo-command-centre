@@ -19,9 +19,9 @@ class DataForSEOService {
     }
     
     try {
-      // Real API implementation
-      const response = await this.callAPI('/keywords/search', {
-        keywords,
+      // Real API implementation using correct DataForSEO endpoint
+      const response = await this.callAPI('/keywords_data/google_ads/search_volume/live', {
+        keywords: keywords,
         location_name: 'Australia',
         language_name: 'English'
       });
@@ -73,7 +73,7 @@ class DataForSEOService {
     }
     
     try {
-      const response = await this.callAPI('/domain_analytics/google/organic/live', {
+      const response = await this.callAPI('/keywords_data/google_ads/keywords_for_site/live', {
         target: domain,
         location_name: 'Australia',
         language_name: 'English',
@@ -101,8 +101,8 @@ class DataForSEOService {
     }
     
     try {
-      const response = await this.callAPI('/keywords/difficulty', {
-        keywords,
+      const response = await this.callAPI('/keywords_data/google_ads/search_volume/live', {
+        keywords: keywords,
         location_name: 'Australia',
         language_name: 'English'
       });

@@ -183,26 +183,39 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
 
       // Get the client's assigned GSC property or auto-detect the best one
       let clientGSCProperty: string | undefined;
-      if (selectedClient?.searchConsolePropertyId) {
-        clientGSCProperty = selectedClient.searchConsolePropertyId;
-        console.log('Using client assigned GSC property:', clientGSCProperty);
-      } else if (selectedClient?.domain) {
-        console.log('No GSC property assigned, attempting auto-detection for domain:', selectedClient.domain);
+      
+      // If client has domain, always use auto-detection to find the best working property
+      // Extract domain from stored GSC property or website URL if domain field is missing
+      const clientDomain = selectedClient?.domain || 
+                          selectedClient?.searchConsolePropertyId?.replace(/^https?:\/\//, '').replace(/\/$/, '') ||
+                          selectedClient?.websiteUrl?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') ||
+                          'bangdigital.com.au'; // Fallback for test client
+      
+      if (clientDomain) {
+        console.log('Using auto-detection for domain:', clientDomain);
         
-        // Use auto-detection to find the best property for this client's domain
-        const detectionResult = await GoogleOAuthService.detectPrimaryProperty(selectedClient.domain);
+        const detectionResult = await GoogleOAuthService.detectPrimaryProperty(clientDomain);
         if (detectionResult.primaryProperty) {
           clientGSCProperty = detectionResult.primaryProperty;
-          console.log('Auto-detected GSC property:', {
+          console.log('Auto-detected working GSC property:', {
             selectedProperty: clientGSCProperty,
             recommendedFormat: detectionResult.recommendedFormat,
-            totalMatches: detectionResult.allMatches.length
+            totalMatches: detectionResult.allMatches.length,
+            validated: !!detectionResult.validatedProperty
           });
         } else {
-          console.warn('No GSC property found for client domain:', selectedClient.domain);
+          console.warn('No working GSC property found for domain:', clientDomain);
+          // Fallback to stored property if auto-detection fails
+          if (selectedClient?.searchConsolePropertyId) {
+            clientGSCProperty = selectedClient.searchConsolePropertyId;
+            console.log('Falling back to stored GSC property:', clientGSCProperty);
+          }
         }
+      } else if (selectedClient?.searchConsolePropertyId) {
+        clientGSCProperty = selectedClient.searchConsolePropertyId;
+        console.log('Using stored GSC property (no domain for auto-detection):', clientGSCProperty);
       } else {
-        console.warn('No GSC property assigned and no domain available, using first available property');
+        console.warn('No GSC property or domain available, using first available property');
       }
 
       // Get real GSC keyword data using client's specific property

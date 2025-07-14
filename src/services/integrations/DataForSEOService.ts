@@ -357,7 +357,7 @@ class DataForSEOService {
       const transformed = {
         keyword: item.keyword || item.query || '',
         searchVolume: item.search_volume || item.volume || 0,
-        difficulty: item.keyword_difficulty || item.difficulty || 0,
+        difficulty: item.keyword_difficulty || item.competition_index || item.difficulty || 0,
         cpc: item.cpc || item.average_cpc || 0,
         competition: item.competition || item.competition_index || 0,
         trend: item.monthly_searches?.map((m: any) => m.search_volume) || [],

@@ -876,7 +876,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                 Previous
               </Button>
             ) : (
-              <div /> {/* Empty div for spacing */
+              <div />
             )}
 
             <div className="flex space-x-3">

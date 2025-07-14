@@ -110,7 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               )}
             </NavLink>
           );
-        })
+        })}
       </nav>
       
       {/* Integration Status */}

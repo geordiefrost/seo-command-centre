@@ -50,6 +50,12 @@ interface KeywordData {
   impressions?: number;
   ctr?: number;
   position?: number;
+  // Cross-reference fields
+  hasClientRanking?: boolean;
+  // Priority scoring fields
+  priorityScore?: number;
+  priorityCategory?: 'quick-win' | 'position-boost' | 'new-opportunity' | 'long-term';
+  opportunityType?: string;
 }
 
 const STEPS: WizardStep[] = [
@@ -130,6 +136,72 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
   });
 
   const selectedClient = clients.find(c => c.id === clientId);
+
+  // SEO-optimized priority scoring algorithm
+  const calculatePriorityScore = (keyword: KeywordData): { score: number; category: string; opportunityType: string } => {
+    let score = 0;
+    let category = 'long-term';
+    let opportunityType = 'Content Creation';
+    
+    // Position Improvement Potential (highest weight)
+    let positionScore = 0;
+    if (keyword.position) {
+      if (keyword.position >= 11 && keyword.position <= 20) {
+        positionScore = 3; // 🔥 Quick Win - Page 2 to Page 1
+        category = 'quick-win';
+        opportunityType = 'Page 1 Breakthrough';
+      } else if (keyword.position >= 4 && keyword.position <= 10) {
+        positionScore = 2; // ⚡ Position Boost - Page 1 improvement
+        category = 'position-boost';
+        opportunityType = 'Top 3 Position';
+      } else if (keyword.position >= 1 && keyword.position <= 3) {
+        positionScore = 1; // Already ranking well
+        category = 'long-term';
+        opportunityType = 'Maintain Ranking';
+      }
+    } else if (keyword.competition === 'LOW' && (keyword.searchVolume || 0) > 100) {
+      positionScore = 1; // 🚀 New Opportunity
+      category = 'new-opportunity';
+      opportunityType = 'Ranking Opportunity';
+    }
+    
+    // Volume Score
+    let volumeScore = 0;
+    const volume = keyword.searchVolume || 0;
+    if (volume > 1000) volumeScore = 3;
+    else if (volume >= 100) volumeScore = 2;
+    else volumeScore = 1;
+    
+    // Competition Score
+    let competitionScore = 0;
+    if (keyword.competition === 'LOW') competitionScore = 3;
+    else if (keyword.competition === 'MEDIUM') competitionScore = 2;
+    else if (keyword.competition === 'HIGH') competitionScore = 1;
+    else competitionScore = 1; // Default
+    
+    // Business Value Score (Intent)
+    let businessScore = 0;
+    if (keyword.intent === 'commercial' || keyword.intent === 'transactional') businessScore = 3;
+    else if (keyword.intent === 'navigational') businessScore = 2;
+    else businessScore = 1; // Informational
+    
+    // Calculate weighted score
+    score = (
+      positionScore * 3 + // Position improvement potential (highest weight)
+      volumeScore * 2 +   // Volume
+      competitionScore * 2 + // Competition advantage
+      businessScore * 1   // Business value
+    ) / 8;
+    
+    // Override category for high-value keywords
+    if (score >= 2.5 && category === 'long-term') {
+      category = 'quick-win';
+    } else if (score >= 2.0 && category === 'long-term') {
+      category = 'position-boost';
+    }
+    
+    return { score: Math.round(score * 100) / 100, category, opportunityType };
+  };
 
   useEffect(() => {
     loadExistingCompetitors();
@@ -415,12 +487,81 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         }
       }
 
+      // Cross-reference competitor keywords with client's GSC data
+      setProcessingStatus('Cross-referencing competitor keywords with GSC data...');
+      const competitorKeywords = allKeywords.filter(k => k.source === 'competitor');
+      
+      if (competitorKeywords.length > 0 && selectedClient?.domain) {
+        try {
+          // Get client's GSC data for competitor keywords
+          const competitorKeywordStrings = competitorKeywords.map(k => k.keyword);
+          console.log('Cross-referencing competitor keywords:', competitorKeywordStrings.slice(0, 5));
+          
+          // Get GSC data for all competitor keywords at once
+          const gscResults = await GoogleOAuthService.getSearchConsoleKeywords(
+            undefined, // Let it auto-detect property
+            undefined, // Use default date range
+            undefined,
+            1000 // Get more results for cross-referencing
+          );
+          
+          // Create a map of GSC keyword performance
+          const gscKeywordMap = new Map();
+          gscResults.forEach(gscKeyword => {
+            gscKeywordMap.set(gscKeyword.keyword.toLowerCase(), {
+              clicks: gscKeyword.clicks,
+              impressions: gscKeyword.impressions,
+              ctr: gscKeyword.ctr,
+              position: gscKeyword.position
+            });
+          });
+          
+          // Enrich competitor keywords with client's GSC performance data
+          allKeywords = allKeywords.map(keyword => {
+            if (keyword.source === 'competitor') {
+              const gscData = gscKeywordMap.get(keyword.keyword.toLowerCase());
+              if (gscData) {
+                console.log(`Found GSC data for competitor keyword: ${keyword.keyword}, position: ${gscData.position}`);
+                return {
+                  ...keyword,
+                  clicks: gscData.clicks,
+                  impressions: gscData.impressions,
+                  ctr: gscData.ctr,
+                  position: gscData.position,
+                  hasClientRanking: true // Flag to indicate client ranks for this keyword
+                };
+              }
+            }
+            return keyword;
+          });
+          
+          console.log('Cross-referencing complete. Enhanced competitor keywords with GSC data.');
+        } catch (error) {
+          console.warn('Failed to cross-reference competitor keywords with GSC:', error);
+        }
+      }
+      
       // Remove duplicates and calculate stats
       const uniqueKeywords = allKeywords.filter((keyword, index, self) =>
         index === self.findIndex(k => k.keyword.toLowerCase() === keyword.keyword.toLowerCase())
       );
+      
+      // Apply priority scoring to all keywords
+      setProcessingStatus('Calculating keyword priorities...');
+      const keywordsWithPriority = uniqueKeywords.map(keyword => {
+        const priorityData = calculatePriorityScore(keyword);
+        return {
+          ...keyword,
+          priorityScore: priorityData.score,
+          priorityCategory: priorityData.category as 'quick-win' | 'position-boost' | 'new-opportunity' | 'long-term',
+          opportunityType: priorityData.opportunityType
+        };
+      });
+      
+      // Sort by priority score (highest first)
+      keywordsWithPriority.sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0));
 
-      setDiscoveredKeywords(uniqueKeywords);
+      setDiscoveredKeywords(keywordsWithPriority);
 
       // Calculate stats
       const branded = uniqueKeywords.filter(k => 
@@ -532,9 +673,13 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           gsc_impressions: keyword.impressions || null,
           gsc_ctr: keyword.ctr || null,
           gsc_position: keyword.position || null,
+          priority_score: keyword.priorityScore || null,
+          priority_category: keyword.priorityCategory || null,
+          opportunity_type: keyword.opportunityType || null,
+          has_client_ranking: keyword.hasClientRanking || false,
           is_branded: selectedClient?.name ? 
             keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
-          is_quick_win: (keyword.searchVolume || 0) > 100 && keyword.competition === 'LOW'
+          is_quick_win: keyword.priorityCategory === 'quick-win'
         }));
 
         await supabase

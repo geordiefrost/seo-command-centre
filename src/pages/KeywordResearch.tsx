@@ -122,7 +122,11 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
         clicks: keyword.gsc_clicks || undefined,
         impressions: keyword.gsc_impressions || undefined,
         ctr: keyword.gsc_ctr || undefined,
-        position: keyword.gsc_position || undefined
+        position: keyword.gsc_position || undefined,
+        priorityScore: keyword.priority_score || undefined,
+        priorityCategory: keyword.priority_category || undefined,
+        opportunityType: keyword.opportunity_type || undefined,
+        hasClientRanking: keyword.has_client_ranking || false
       }));
       
       setProjectKeywords(transformedKeywords);

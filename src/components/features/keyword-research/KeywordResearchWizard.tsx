@@ -174,18 +174,6 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
     setGscKeywords(gscKeywords.filter((_, i) => i !== index));
   };
 
-  const handleTestDataForSEO = async () => {
-    console.log('Testing DataForSEO credentials...');
-    try {
-      const result = await DataForSEOService.testCredentials();
-      console.log('DataForSEO test result:', result);
-      alert(`DataForSEO Test: ${result.success ? 'SUCCESS' : 'FAILED'}\n${result.message}`);
-    } catch (error) {
-      console.error('DataForSEO test error:', error);
-      alert(`DataForSEO Test Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-
   const handleLoadGSCKeywords = async () => {
     setIsLoadingGSC(true);
     try {
@@ -512,23 +500,6 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
               />
             </div>
 
-            {/* Temporary debug section */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Debug Tools</h4>
-              <div className="space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTestDataForSEO}
-                  className="text-xs"
-                >
-                  Test DataForSEO
-                </Button>
-                <span className="text-xs text-gray-500">
-                  Client GSC Property: {selectedClient?.searchConsolePropertyId || 'Not assigned'}
-                </span>
-              </div>
-            </div>
 
           </div>
         );

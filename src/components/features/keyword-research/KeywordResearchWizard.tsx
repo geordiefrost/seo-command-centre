@@ -1,0 +1,913 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  ArrowRight, 
+  ArrowLeft, 
+  CheckCircle, 
+  Calendar,
+  FileText,
+  Target,
+  Search,
+  Plus,
+  X,
+  Building,
+  Globe,
+  Loader2,
+  Bot,
+  Users,
+  Download
+} from 'lucide-react';
+import { Card, Button, Input, Select } from '../../common';
+import { useAppStore } from '../../../store/appStore';
+import { supabase } from '../../../lib/supabase';
+import GoogleOAuthService from '../../../services/integrations/GoogleOAuthService';
+import DataForSEOService from '../../../services/integrations/DataForSEOService';
+
+interface WizardStep {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<any>;
+}
+
+interface CompetitorData {
+  id?: string;
+  domain: string;
+  name?: string;
+  priority: number;
+  isExisting: boolean;
+}
+
+interface KeywordData {
+  keyword: string;
+  searchVolume?: number;
+  difficulty?: number;
+  source: 'manual' | 'gsc' | 'competitor';
+  competition?: number;
+  cpc?: number;
+  intent?: 'informational' | 'navigational' | 'transactional' | 'commercial';
+}
+
+const STEPS: WizardStep[] = [
+  {
+    id: 'setup',
+    title: 'Project Setup',
+    description: 'Basic project information and settings',
+    icon: FileText
+  },
+  {
+    id: 'seeds',
+    title: 'Seed Keywords',
+    description: 'Initial keywords and GSC data import',
+    icon: Search
+  },
+  {
+    id: 'competitors',
+    title: 'Competitor Selection',
+    description: 'Choose competitors for keyword analysis',
+    icon: Target
+  },
+  {
+    id: 'discovery',
+    title: 'Keyword Discovery',
+    description: 'Generate keywords from all sources',
+    icon: Bot
+  },
+  {
+    id: 'review',
+    title: 'Review & Save',
+    description: 'Review findings and save project',
+    icon: CheckCircle
+  }
+];
+
+interface KeywordResearchWizardProps {
+  clientId: string;
+  onComplete: () => void;
+  onCancel: () => void;
+  editingProject?: any;
+}
+
+export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
+  clientId,
+  onComplete,
+  onCancel,
+  editingProject
+}) => {
+  const { clients } = useAppStore();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
+
+  // Form data
+  const [projectData, setProjectData] = useState({
+    name: editingProject?.name || '',
+    description: editingProject?.description || '',
+    dateRangeStart: editingProject?.dateRangeStart || '',
+    dateRangeEnd: editingProject?.dateRangeEnd || '',
+    assignedTo: editingProject?.assignedTo || ''
+  });
+
+  const [seedKeywords, setSeedKeywords] = useState<string[]>(
+    editingProject?.settings?.seedKeywords || []
+  );
+  const [newSeedKeyword, setNewSeedKeyword] = useState('');
+  const [gscKeywords, setGscKeywords] = useState<KeywordData[]>([]);
+  const [isLoadingGSC, setIsLoadingGSC] = useState(false);
+
+  const [existingCompetitors, setExistingCompetitors] = useState<CompetitorData[]>([]);
+  const [selectedCompetitors, setSelectedCompetitors] = useState<CompetitorData[]>([]);
+  const [newCompetitor, setNewCompetitor] = useState({ domain: '', name: '' });
+
+  const [discoveredKeywords, setDiscoveredKeywords] = useState<KeywordData[]>([]);
+  const [keywordStats, setKeywordStats] = useState({
+    total: 0,
+    branded: 0,
+    commercial: 0,
+    informational: 0,
+    quickWins: 0
+  });
+
+  const selectedClient = clients.find(c => c.id === clientId);
+
+  useEffect(() => {
+    loadExistingCompetitors();
+  }, [clientId]);
+
+  const loadExistingCompetitors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('client_competitors')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('priority', { ascending: true });
+
+      if (error) throw error;
+
+      const competitors = data?.map(comp => ({
+        id: comp.id,
+        domain: comp.competitor_domain,
+        name: comp.competitor_name || '',
+        priority: comp.priority,
+        isExisting: true
+      })) || [];
+
+      setExistingCompetitors(competitors);
+    } catch (error) {
+      console.error('Error loading competitors:', error);
+    }
+  };
+
+  const handleAddSeedKeyword = () => {
+    if (newSeedKeyword.trim() && !seedKeywords.includes(newSeedKeyword.trim())) {
+      setSeedKeywords([...seedKeywords, newSeedKeyword.trim()]);
+      setNewSeedKeyword('');
+    }
+  };
+
+  const handleRemoveSeedKeyword = (keyword: string) => {
+    setSeedKeywords(seedKeywords.filter(k => k !== keyword));
+  };
+
+  const handleLoadGSCKeywords = async () => {
+    setIsLoadingGSC(true);
+    try {
+      if (!GoogleOAuthService.isAuthenticated()) {
+        await GoogleOAuthService.initiateOAuth();
+      }
+
+      // Mock GSC keyword loading for now
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const mockGSCKeywords: KeywordData[] = [
+        { keyword: 'brand name', searchVolume: 1200, difficulty: 20, source: 'gsc', intent: 'navigational' },
+        { keyword: 'product category', searchVolume: 800, difficulty: 45, source: 'gsc', intent: 'commercial' },
+        { keyword: 'how to guide', searchVolume: 600, difficulty: 35, source: 'gsc', intent: 'informational' }
+      ];
+
+      setGscKeywords(mockGSCKeywords);
+    } catch (error) {
+      console.error('Error loading GSC keywords:', error);
+      alert('Failed to load GSC keywords. Please try again.');
+    } finally {
+      setIsLoadingGSC(false);
+    }
+  };
+
+  const handleCompetitorToggle = (competitor: CompetitorData) => {
+    const isSelected = selectedCompetitors.some(c => 
+      c.domain === competitor.domain
+    );
+
+    if (isSelected) {
+      setSelectedCompetitors(selectedCompetitors.filter(c => 
+        c.domain !== competitor.domain
+      ));
+    } else {
+      setSelectedCompetitors([...selectedCompetitors, competitor]);
+    }
+  };
+
+  const handleAddNewCompetitor = () => {
+    if (newCompetitor.domain.trim()) {
+      const competitor: CompetitorData = {
+        domain: newCompetitor.domain.trim(),
+        name: newCompetitor.name.trim(),
+        priority: existingCompetitors.length + selectedCompetitors.length + 1,
+        isExisting: false
+      };
+
+      setSelectedCompetitors([...selectedCompetitors, competitor]);
+      setNewCompetitor({ domain: '', name: '' });
+    }
+  };
+
+  const handleRemoveCompetitor = (domain: string) => {
+    setSelectedCompetitors(selectedCompetitors.filter(c => c.domain !== domain));
+  };
+
+  const handleKeywordDiscovery = async () => {
+    setIsProcessing(true);
+    setProcessingStatus('Analyzing competitor keywords...');
+
+    try {
+      const allKeywords: KeywordData[] = [];
+
+      // Add seed keywords
+      setProcessingStatus('Processing seed keywords...');
+      const seedKeywordData = await DataForSEOService.getKeywordData(seedKeywords);
+      allKeywords.push(...seedKeywordData.map(k => ({
+        keyword: k.keyword,
+        searchVolume: k.searchVolume,
+        difficulty: k.difficulty,
+        source: 'manual' as const,
+        competition: k.competition,
+        cpc: k.cpc,
+        intent: k.intent
+      })));
+
+      // Add GSC keywords
+      allKeywords.push(...gscKeywords);
+
+      // Process competitor keywords
+      for (const competitor of selectedCompetitors) {
+        setProcessingStatus(`Analyzing ${competitor.domain}...`);
+        
+        try {
+          const competitorKeywords = await DataForSEOService.getCompetitorRankings(competitor.domain);
+          
+          const competitorData = competitorKeywords.slice(0, 50).map((k: any) => ({
+            keyword: k.keyword,
+            searchVolume: k.volume || 0,
+            difficulty: Math.floor(Math.random() * 100), // Mock difficulty
+            source: 'competitor' as const,
+            competition: Math.random(),
+            cpc: Math.random() * 5,
+            intent: ['informational', 'commercial', 'transactional', 'navigational'][
+              Math.floor(Math.random() * 4)
+            ] as any
+          }));
+
+          allKeywords.push(...competitorData);
+        } catch (error) {
+          console.warn(`Failed to get keywords for ${competitor.domain}:`, error);
+        }
+      }
+
+      // Remove duplicates and calculate stats
+      const uniqueKeywords = allKeywords.filter((keyword, index, self) =>
+        index === self.findIndex(k => k.keyword.toLowerCase() === keyword.keyword.toLowerCase())
+      );
+
+      setDiscoveredKeywords(uniqueKeywords);
+
+      // Calculate stats
+      const branded = uniqueKeywords.filter(k => 
+        selectedClient?.name && k.keyword.toLowerCase().includes(selectedClient.name.toLowerCase())
+      ).length;
+
+      const commercial = uniqueKeywords.filter(k => k.intent === 'commercial').length;
+      const informational = uniqueKeywords.filter(k => k.intent === 'informational').length;
+      const quickWins = uniqueKeywords.filter(k => 
+        (k.searchVolume || 0) > 100 && (k.difficulty || 0) < 30
+      ).length;
+
+      setKeywordStats({
+        total: uniqueKeywords.length,
+        branded,
+        commercial,
+        informational,
+        quickWins
+      });
+
+    } catch (error) {
+      console.error('Error during keyword discovery:', error);
+      alert('Failed to complete keyword discovery. Please try again.');
+    } finally {
+      setIsProcessing(false);
+      setProcessingStatus('');
+    }
+  };
+
+  const handleSaveProject = async () => {
+    setIsProcessing(true);
+    setProcessingStatus('Saving project...');
+
+    try {
+      // Create or update project
+      const projectPayload = {
+        client_id: clientId,
+        name: projectData.name,
+        description: projectData.description,
+        date_range_start: projectData.dateRangeStart || null,
+        date_range_end: projectData.dateRangeEnd || null,
+        status: 'completed',
+        assigned_to: projectData.assignedTo || null,
+        settings: {
+          seedKeywords,
+          selectedCompetitors,
+          gscImported: gscKeywords.length > 0
+        }
+      };
+
+      let projectId = editingProject?.id;
+
+      if (editingProject) {
+        // Update existing project
+        const { error: updateError } = await supabase
+          .from('keyword_research_projects')
+          .update(projectPayload)
+          .eq('id', editingProject.id);
+
+        if (updateError) throw updateError;
+
+        // Delete existing keywords
+        await supabase
+          .from('keywords')
+          .delete()
+          .eq('project_id', editingProject.id);
+      } else {
+        // Create new project
+        const { data: newProject, error: insertError } = await supabase
+          .from('keyword_research_projects')
+          .insert([projectPayload])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        projectId = newProject.id;
+      }
+
+      // Save non-existing competitors to client_competitors
+      setProcessingStatus('Saving new competitors...');
+      const newCompetitors = selectedCompetitors.filter(c => !c.isExisting);
+      
+      if (newCompetitors.length > 0) {
+        const competitorInserts = newCompetitors.map(comp => ({
+          client_id: clientId,
+          competitor_domain: comp.domain,
+          competitor_name: comp.name || null,
+          priority: comp.priority
+        }));
+
+        await supabase
+          .from('client_competitors')
+          .insert(competitorInserts);
+      }
+
+      // Save keywords
+      setProcessingStatus('Saving keywords...');
+      if (discoveredKeywords.length > 0) {
+        const keywordInserts = discoveredKeywords.map(keyword => ({
+          project_id: projectId,
+          keyword: keyword.keyword,
+          search_volume: keyword.searchVolume || null,
+          difficulty: keyword.difficulty || null,
+          competition_level: keyword.competition ? Math.round(keyword.competition * 100) : null,
+          search_intent: keyword.intent || null,
+          source: keyword.source,
+          is_branded: selectedClient?.name ? 
+            keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
+          is_quick_win: (keyword.searchVolume || 0) > 100 && (keyword.difficulty || 0) < 30
+        }));
+
+        await supabase
+          .from('keywords')
+          .insert(keywordInserts);
+      }
+
+      onComplete();
+    } catch (error) {
+      console.error('Error saving project:', error);
+      alert('Failed to save project. Please try again.');
+    } finally {
+      setIsProcessing(false);
+      setProcessingStatus('');
+    }
+  };
+
+  const nextStep = () => {
+    if (currentStep === 3 && discoveredKeywords.length === 0) {
+      handleKeywordDiscovery().then(() => {
+        setCurrentStep(currentStep + 1);
+      });
+    } else {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep(currentStep - 1);
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 0: return projectData.name.trim().length > 0;
+      case 1: return seedKeywords.length > 0 || gscKeywords.length > 0;
+      case 2: return selectedCompetitors.length > 0;
+      case 3: return true;
+      case 4: return discoveredKeywords.length > 0;
+      default: return true;
+    }
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0: // Project Setup
+        return (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Project Name *
+              </label>
+              <Input
+                value={projectData.name}
+                onChange={(e) => setProjectData({...projectData, name: e.target.value})}
+                placeholder="e.g., Q1 2024 Keyword Research"
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                value={projectData.description}
+                onChange={(e) => setProjectData({...projectData, description: e.target.value})}
+                placeholder="Project goals and scope..."
+                className="w-full p-3 border border-gray-300 rounded-md resize-none"
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Start Date
+                </label>
+                <Input
+                  type="date"
+                  value={projectData.dateRangeStart}
+                  onChange={(e) => setProjectData({...projectData, dateRangeStart: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  End Date
+                </label>
+                <Input
+                  type="date"
+                  value={projectData.dateRangeEnd}
+                  onChange={(e) => setProjectData({...projectData, dateRangeEnd: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assigned To
+              </label>
+              <Input
+                value={projectData.assignedTo}
+                onChange={(e) => setProjectData({...projectData, assignedTo: e.target.value})}
+                placeholder="Team member name"
+              />
+            </div>
+          </div>
+        );
+
+      case 1: // Seed Keywords
+        return (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Manual Seed Keywords
+              </label>
+              <div className="flex space-x-2 mb-3">
+                <Input
+                  value={newSeedKeyword}
+                  onChange={(e) => setNewSeedKeyword(e.target.value)}
+                  placeholder="Enter keyword"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddSeedKeyword()}
+                  className="flex-1"
+                />
+                <Button onClick={handleAddSeedKeyword} icon={Plus}>
+                  Add
+                </Button>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {seedKeywords.map((keyword, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                  >
+                    {keyword}
+                    <button
+                      onClick={() => handleRemoveSeedKeyword(keyword)}
+                      className="ml-2 text-blue-600 hover:text-blue-800"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Google Search Console Keywords
+                </label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadGSCKeywords}
+                  disabled={isLoadingGSC}
+                  icon={isLoadingGSC ? Loader2 : Download}
+                >
+                  {isLoadingGSC ? 'Loading...' : 'Import from GSC'}
+                </Button>
+              </div>
+              
+              {gscKeywords.length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                  <p className="text-sm text-green-800">
+                    ✓ Imported {gscKeywords.length} keywords from Google Search Console
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 2: // Competitor Selection
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Existing Competitors</h3>
+              {existingCompetitors.length > 0 ? (
+                <div className="space-y-2">
+                  {existingCompetitors.map((competitor) => (
+                    <div
+                      key={competitor.id}
+                      className={`flex items-center justify-between p-3 border rounded-md cursor-pointer ${
+                        selectedCompetitors.some(c => c.domain === competitor.domain)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => handleCompetitorToggle(competitor)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                          <Building className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {competitor.name || competitor.domain}
+                          </div>
+                          <div className="text-sm text-gray-500">{competitor.domain}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-500">Priority {competitor.priority}</span>
+                        {selectedCompetitors.some(c => c.domain === competitor.domain) && (
+                          <CheckCircle className="h-5 w-5 text-blue-600" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-4">
+                  No existing competitors found for this client.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Competitor</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input
+                  value={newCompetitor.domain}
+                  onChange={(e) => setNewCompetitor({...newCompetitor, domain: e.target.value})}
+                  placeholder="competitor-domain.com"
+                />
+                <Input
+                  value={newCompetitor.name}
+                  onChange={(e) => setNewCompetitor({...newCompetitor, name: e.target.value})}
+                  placeholder="Competitor Name (optional)"
+                />
+                <Button onClick={handleAddNewCompetitor} icon={Plus}>
+                  Add Competitor
+                </Button>
+              </div>
+            </div>
+
+            {selectedCompetitors.filter(c => !c.isExisting).length > 0 && (
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">New Competitors to Add</h4>
+                <div className="space-y-2">
+                  {selectedCompetitors.filter(c => !c.isExisting).map((competitor) => (
+                    <div
+                      key={competitor.domain}
+                      className="flex items-center justify-between p-3 border border-green-200 bg-green-50 rounded-md"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <Globe className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {competitor.name || competitor.domain}
+                          </div>
+                          <div className="text-sm text-gray-500">{competitor.domain}</div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveCompetitor(competitor.domain)}
+                        icon={X}
+                        className="text-red-600"
+                      >
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 3: // Keyword Discovery
+        return (
+          <div className="space-y-6">
+            {isProcessing ? (
+              <div className="text-center py-12">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Discovering Keywords
+                </h3>
+                <p className="text-gray-600">{processingStatus}</p>
+              </div>
+            ) : discoveredKeywords.length > 0 ? (
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Discovery Complete!</h3>
+                
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                  <div className="text-center p-4 bg-blue-50 rounded-md">
+                    <div className="text-2xl font-bold text-blue-600">{keywordStats.total}</div>
+                    <div className="text-sm text-blue-800">Total Keywords</div>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-md">
+                    <div className="text-2xl font-bold text-purple-600">{keywordStats.branded}</div>
+                    <div className="text-sm text-purple-800">Branded</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-md">
+                    <div className="text-2xl font-bold text-green-600">{keywordStats.commercial}</div>
+                    <div className="text-sm text-green-800">Commercial</div>
+                  </div>
+                  <div className="text-center p-4 bg-yellow-50 rounded-md">
+                    <div className="text-2xl font-bold text-yellow-600">{keywordStats.informational}</div>
+                    <div className="text-sm text-yellow-800">Informational</div>
+                  </div>
+                  <div className="text-center p-4 bg-orange-50 rounded-md">
+                    <div className="text-2xl font-bold text-orange-600">{keywordStats.quickWins}</div>
+                    <div className="text-sm text-orange-800">Quick Wins</div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-md p-4">
+                  <h4 className="font-medium text-gray-900 mb-2">Preview of Discovered Keywords</h4>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {discoveredKeywords.slice(0, 10).map((keyword, index) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <span className="text-gray-900">{keyword.keyword}</span>
+                        <span className="text-gray-500">
+                          Vol: {keyword.searchVolume || 'N/A'} | 
+                          Diff: {keyword.difficulty || 'N/A'} | 
+                          {keyword.source}
+                        </span>
+                      </div>
+                    ))}
+                    {discoveredKeywords.length > 10 && (
+                      <div className="text-sm text-gray-500 text-center pt-2">
+                        + {discoveredKeywords.length - 10} more keywords
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Ready to Discover Keywords
+                </h3>
+                <p className="text-gray-600">
+                  We'll analyze {seedKeywords.length} seed keywords, {gscKeywords.length} GSC keywords, 
+                  and {selectedCompetitors.length} competitors to find relevant keywords.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+
+      case 4: // Review & Save
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Project Summary</h3>
+              
+              <div className="bg-gray-50 rounded-md p-4 space-y-3">
+                <div>
+                  <span className="font-medium text-gray-700">Project Name:</span>
+                  <span className="ml-2 text-gray-900">{projectData.name}</span>
+                </div>
+                
+                <div>
+                  <span className="font-medium text-gray-700">Client:</span>
+                  <span className="ml-2 text-gray-900">{selectedClient?.name}</span>
+                </div>
+                
+                <div>
+                  <span className="font-medium text-gray-700">Keywords Found:</span>
+                  <span className="ml-2 text-gray-900">{discoveredKeywords.length}</span>
+                </div>
+                
+                <div>
+                  <span className="font-medium text-gray-700">Competitors Analyzed:</span>
+                  <span className="ml-2 text-gray-900">{selectedCompetitors.length}</span>
+                </div>
+                
+                <div>
+                  <span className="font-medium text-gray-700">Data Sources:</span>
+                  <span className="ml-2 text-gray-900">
+                    {[
+                      seedKeywords.length > 0 && 'Manual Seeds',
+                      gscKeywords.length > 0 && 'Google Search Console',
+                      selectedCompetitors.length > 0 && 'Competitor Analysis'
+                    ].filter(Boolean).join(', ')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium text-gray-900 mb-2">Key Insights</h4>
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                <ul className="space-y-2 text-sm text-blue-800">
+                  <li>• Found {keywordStats.quickWins} quick win opportunities (high volume, low difficulty)</li>
+                  <li>• Identified {keywordStats.commercial} commercial intent keywords for conversion focus</li>
+                  <li>• Discovered {keywordStats.informational} informational keywords for content marketing</li>
+                  {selectedCompetitors.filter(c => !c.isExisting).length > 0 && (
+                    <li>• Added {selectedCompetitors.filter(c => !c.isExisting).length} new competitors to client profile</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <Card className="overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {editingProject ? 'Edit' : 'New'} Keyword Research Project
+              </h2>
+              <p className="text-sm text-gray-600">
+                Step {currentStep + 1} of {STEPS.length}: {STEPS[currentStep].title}
+              </p>
+            </div>
+            <Button variant="ghost" onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+
+        {/* Progress Steps */}
+        <div className="px-6 py-4 bg-gray-50">
+          <div className="flex items-center justify-between">
+            {STEPS.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = index === currentStep;
+              const isCompleted = index < currentStep;
+              
+              return (
+                <div key={step.id} className="flex items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : isCompleted
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-300 text-gray-600'
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle className="h-5 w-5" />
+                    ) : (
+                      <Icon className="h-4 w-4" />
+                    )}
+                  </div>
+                  
+                  <div className="ml-3 hidden md:block">
+                    <div className={`text-sm font-medium ${
+                      isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
+                    }`}>
+                      {step.title}
+                    </div>
+                  </div>
+                  
+                  {index < STEPS.length - 1 && (
+                    <div className={`w-8 h-0.5 mx-4 ${
+                      isCompleted ? 'bg-green-600' : 'bg-gray-300'
+                    }`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Step Content */}
+        <div className="px-6 py-6">
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {STEPS[currentStep].title}
+            </h3>
+            <p className="text-gray-600">
+              {STEPS[currentStep].description}
+            </p>
+          </div>
+
+          {renderStepContent()}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 0}
+              icon={ArrowLeft}
+            >
+              Previous
+            </Button>
+
+            <div className="flex space-x-3">
+              {currentStep === STEPS.length - 1 ? (
+                <Button
+                  onClick={handleSaveProject}
+                  disabled={!canProceed() || isProcessing}
+                  icon={isProcessing ? Loader2 : CheckCircle}
+                >
+                  {isProcessing ? processingStatus : 'Save Project'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={nextStep}
+                  disabled={!canProceed() || isProcessing}
+                  icon={isProcessing ? Loader2 : ArrowRight}
+                >
+                  {isProcessing ? 'Processing...' : 'Next'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};

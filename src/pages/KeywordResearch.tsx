@@ -14,6 +14,7 @@ import {
 import { Card, Button, Badge } from '../components/common';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '../lib/supabase';
+import { KeywordResearchWizard } from '../components/features/keyword-research/KeywordResearchWizard';
 
 interface KeywordResearchProject {
   id: string;
@@ -39,6 +40,7 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [selectedProject, setSelectedProject] = useState<KeywordResearchProject | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [editingProject, setEditingProject] = useState<KeywordResearchProject | null>(null);
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
@@ -94,7 +96,7 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
   };
 
   const handleEditProject = (project: KeywordResearchProject) => {
-    setSelectedProject(project);
+    setEditingProject(project);
     setShowWizard(true);
   };
 
@@ -136,16 +138,19 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
   if (showWizard) {
     return (
       <div className="p-6">
-        {/* TODO: Implement KeywordResearchWizard */}
-        <div className="max-w-4xl mx-auto">
-          <Card className="p-8 text-center">
-            <h2 className="text-xl font-semibold mb-4">Keyword Research Wizard</h2>
-            <p className="text-gray-600 mb-6">Wizard component coming soon...</p>
-            <Button onClick={() => setShowWizard(false)}>
-              Back to Projects
-            </Button>
-          </Card>
-        </div>
+        <KeywordResearchWizard
+          clientId={selectedClientId!}
+          onComplete={() => {
+            setShowWizard(false);
+            setEditingProject(null);
+            loadProjects();
+          }}
+          onCancel={() => {
+            setShowWizard(false);
+            setEditingProject(null);
+          }}
+          editingProject={editingProject}
+        />
       </div>
     );
   }

@@ -42,7 +42,7 @@ interface KeywordData {
   keyword: string;
   searchVolume?: number;
   source: 'manual' | 'gsc' | 'competitor';
-  competition?: number;
+  competition?: string; // LOW, MEDIUM, HIGH
   cpc?: number;
   intent?: 'informational' | 'navigational' | 'transactional' | 'commercial';
   // GSC specific fields

@@ -211,7 +211,7 @@ export interface KeywordData {
   searchVolume: number;
   cpc: number;
   trend: number[];
-  competition: number;
+  competition: string; // LOW, MEDIUM, HIGH
   intent: 'informational' | 'navigational' | 'transactional' | 'commercial';
   relatedKeywords: string[];
 }
@@ -223,7 +223,7 @@ export interface SERPAnalysis {
   featuredSnippets: FeaturedSnippet[];
   relatedQuestions: RelatedQuestion[];
   searchVolume: number;
-  competition: number;
+  competition: string; // LOW, MEDIUM, HIGH
 }
 
 export interface OrganicResult {

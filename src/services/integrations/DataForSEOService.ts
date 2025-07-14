@@ -404,7 +404,7 @@ class DataForSEOService {
         answer: item.description || '',
       })),
       searchVolume: 0, // This would need a separate API call
-      difficulty: 0, // This would need a separate API call
+      competition: 'UNKNOWN', // This would need a separate API call
     };
   }
   

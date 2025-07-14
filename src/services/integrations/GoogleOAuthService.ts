@@ -74,7 +74,6 @@ class GoogleOAuthService {
       authUrl.searchParams.set('scope', this.config.scopes.join(' '));
       authUrl.searchParams.set('access_type', 'offline'); // Required for refresh tokens
       authUrl.searchParams.set('prompt', 'consent'); // Force consent to get refresh token
-      authUrl.searchParams.set('approval_prompt', 'force'); // Legacy support
       authUrl.searchParams.set('state', 'search-console-auth');
 
       console.log('Initiating Google OAuth flow:', {

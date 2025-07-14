@@ -35,18 +35,18 @@ class DataForSEOService {
     try {
       console.log('Testing DataForSEO credentials...');
       
-      // Use form-data authentication as required by DataForSEO
-      const formData = new URLSearchParams();
-      formData.append('login', this.apiLogin);
-      formData.append('password', this.apiPassword);
-      formData.append('data', JSON.stringify([{"keywords": ["test"], "location_name": "Australia", "language_name": "English"}]));
+      // Use HTTP Basic Auth with JSON payload as required by DataForSEO
+      const payload = [{"keywords": ["test"], "language_code": "en"}];
+      const authString = `${this.apiLogin}:${this.apiPassword}`;
+      const encodedAuth = btoa(authString);
       
       const response = await fetch(`${this.baseURL}/keywords_data/google_ads/search_volume/live`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${encodedAuth}`,
         },
-        body: formData,
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -275,22 +275,24 @@ class DataForSEOService {
       passwordLength: this.apiPassword.length
     });
     
-    // DataForSEO uses form-data style authentication, not Basic Auth
-    const formData = new URLSearchParams();
-    formData.append('login', this.apiLogin);
-    formData.append('password', this.apiPassword);
-    formData.append('data', JSON.stringify(payload));
+    // DataForSEO uses HTTP Basic Auth with JSON payload
+    const authString = `${this.apiLogin}:${this.apiPassword}`;
+    const encodedAuth = btoa(authString);
     
     const headers = {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
+      'Authorization': `Basic ${encodedAuth}`,
     };
     
-    console.log('Request headers:', headers);
+    console.log('Request headers:', {
+      'Content-Type': headers['Content-Type'],
+      'Authorization': `Basic [${encodedAuth.length} chars]`
+    });
     
     const response = await fetch(url, {
       method: 'POST',
       headers,
-      body: formData,
+      body: JSON.stringify(payload),
     });
     
     console.log('DataForSEO API response status:', {

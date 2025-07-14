@@ -419,7 +419,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
     setProcessingStatus('Analyzing competitor keywords...');
 
     try {
-      const allKeywords: KeywordData[] = [];
+      let allKeywords: KeywordData[] = [];
 
       // Add seed keywords
       setProcessingStatus('Processing seed keywords...');

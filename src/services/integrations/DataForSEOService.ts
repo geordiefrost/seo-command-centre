@@ -6,9 +6,31 @@ class DataForSEOService {
   private apiLogin = import.meta.env.VITE_DATAFORSEO_LOGIN;
   private apiPassword = import.meta.env.VITE_DATAFORSEO_PASSWORD;
   private baseURL = import.meta.env.VITE_DATAFORSEO_API_URL;
+
+  constructor() {
+    // Debug environment variables
+    console.log('DataForSEO Service Initialization:', {
+      useMockData: this.useMockData,
+      hasLogin: !!this.apiLogin,
+      hasPassword: !!this.apiPassword,
+      hasBaseURL: !!this.baseURL,
+      mockMode: import.meta.env.VITE_MOCK_MODE,
+      loginLength: this.apiLogin?.length || 0,
+      passwordLength: this.apiPassword?.length || 0,
+      baseURL: this.baseURL
+    });
+  }
   
   async getKeywordData(keywords: string[]): Promise<KeywordData[]> {
-    if (this.useMockData && !this.hasCredentials()) {
+    console.log('getKeywordData called:', {
+      keywords,
+      useMockData: this.useMockData,
+      hasCredentials: this.hasCredentials()
+    });
+
+    // Use mock data only if explicitly in mock mode OR if no credentials
+    if (this.useMockData || !this.hasCredentials()) {
+      console.log('Using mock data for keyword search');
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 800));
       return mockKeywordData.filter(k => 
@@ -19,6 +41,7 @@ class DataForSEOService {
     }
     
     try {
+      console.log('Attempting real DataForSEO API call...');
       // Real API implementation using correct DataForSEO endpoint
       const response = await this.callAPI('/keywords_data/google_ads/search_volume/live', {
         keywords: keywords,
@@ -26,6 +49,7 @@ class DataForSEOService {
         language_name: 'English'
       });
       
+      console.log('DataForSEO API response received:', response);
       // Transform DataForSEO response to our format
       return this.transformKeywordData(response);
     } catch (error) {
@@ -65,7 +89,15 @@ class DataForSEOService {
   }
   
   async getCompetitorRankings(domain: string, keywords?: string[]): Promise<any> {
-    if (this.useMockData && !this.hasCredentials()) {
+    console.log('getCompetitorRankings called:', {
+      domain,
+      keywords,
+      useMockData: this.useMockData,
+      hasCredentials: this.hasCredentials()
+    });
+
+    if (this.useMockData || !this.hasCredentials()) {
+      console.log('Using mock data for competitor rankings');
       await new Promise(resolve => setTimeout(resolve, 1000));
       return mockCompetitorData.rankings.filter(r => 
         !keywords || keywords.some(k => r.keyword.includes(k))
@@ -73,6 +105,7 @@ class DataForSEOService {
     }
     
     try {
+      console.log('Attempting real DataForSEO competitor API call...');
       const response = await this.callAPI('/keywords_data/google_ads/keywords_for_site/live', {
         target: domain,
         location_name: 'Australia',
@@ -80,6 +113,7 @@ class DataForSEOService {
         limit: 100
       });
       
+      console.log('DataForSEO competitor API response received:', response);
       return this.transformCompetitorData(response);
     } catch (error) {
       console.warn('DataForSEO competitor API failed, falling back to mock data:', error);
@@ -154,14 +188,33 @@ class DataForSEOService {
   }
   
   private async callAPI(endpoint: string, data: any): Promise<any> {
+    console.log('callAPI called:', {
+      endpoint,
+      hasCredentials: this.hasCredentials(),
+      baseURL: this.baseURL,
+      dataKeys: Object.keys(data)
+    });
+
     if (!this.hasCredentials()) {
-      throw new Error('DataForSEO credentials not configured');
+      const error = 'DataForSEO credentials not configured';
+      console.error(error, {
+        hasLogin: !!this.apiLogin,
+        hasPassword: !!this.apiPassword
+      });
+      throw new Error(error);
     }
     
     // DataForSEO API expects an array of tasks
     const payload = Array.isArray(data) ? data : [data];
+    const url = `${this.baseURL}${endpoint}`;
     
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    console.log('Making DataForSEO API request:', {
+      url,
+      payloadLength: payload.length,
+      firstTask: payload[0]
+    });
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -170,11 +223,24 @@ class DataForSEOService {
       body: JSON.stringify(payload),
     });
     
+    console.log('DataForSEO API response status:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('DataForSEO API error response:', errorText);
       throw new Error(`DataForSEO API error: ${response.status} ${response.statusText}`);
     }
     
     const result = await response.json();
+    console.log('DataForSEO API response data:', {
+      statusCode: result.status_code,
+      statusMessage: result.status_message,
+      tasksLength: result.tasks?.length
+    });
     
     if (result.status_code !== 20000) {
       throw new Error(`DataForSEO API error: ${result.status_message}`);

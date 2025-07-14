@@ -210,9 +210,33 @@ class GoogleOAuthService {
         });
         
         if (response.status === 401) {
-          // Token expired, clear it
+          // Try to refresh token
+          try {
+            console.log('Attempting to refresh access token...');
+            await this.refreshAccessToken();
+            
+            // Retry the request with new token
+            const newToken = this.getStoredAccessToken();
+            if (newToken) {
+              const retryResponse = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
+                headers: {
+                  'Authorization': `Bearer ${newToken}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+              
+              if (retryResponse.ok) {
+                const retryData = await retryResponse.json();
+                return retryData.siteEntry || [];
+              }
+            }
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError);
+          }
+          
+          // Token refresh failed, clear tokens and require re-auth
           this.signOut();
-          throw new Error('Access token expired. Please re-authenticate with Google.');
+          throw new Error('Access token expired and refresh failed. Please re-authenticate with Google.');
         }
         
         throw new Error(`GSC API Error (${response.status}): ${response.statusText}. ${errorText}`);
@@ -430,6 +454,8 @@ class GoogleOAuthService {
       throw new Error('No refresh token available');
     }
 
+    console.log('Refreshing Google access token...');
+
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -444,11 +470,25 @@ class GoogleOAuthService {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to refresh access token');
+      const errorText = await response.text();
+      console.error('Token refresh failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      throw new Error(`Failed to refresh access token: ${response.status} ${response.statusText}`);
     }
 
     const tokens = await response.json();
+    console.log('Token refresh successful');
+    
     localStorage.setItem('google_access_token', tokens.access_token);
+    
+    // Update expiration time if provided
+    if (tokens.expires_in) {
+      const expiresAt = Date.now() + (tokens.expires_in * 1000);
+      localStorage.setItem('google_token_expires_at', expiresAt.toString());
+    }
   }
 
   /**

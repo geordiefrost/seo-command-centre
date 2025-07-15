@@ -217,8 +217,8 @@ class DataForSEOService {
       });
       
       // Try DataForSEO Labs endpoint first (better suggestions)
-      let endpoint = '/dataforseo_labs/google/keyword_suggestions/live';
-      let payload = [{
+      const labsEndpoint = '/dataforseo_labs/google/keyword_suggestions/live';
+      const labsPayload = [{
         "keyword": seedKeyword,
         "language_code": "en",
         "location_code": 2036, // Australia
@@ -228,7 +228,7 @@ class DataForSEOService {
       console.log(`🧪 Trying DataForSEO Labs endpoint first...`);
       
       try {
-        const labsData = await this.callAPI(endpoint, payload);
+        const labsData = await this.callAPI(labsEndpoint, labsPayload);
         if (labsData && labsData.length > 0) {
           console.log(`✅ DataForSEO Labs endpoint successful`);
           return this.transformLabsKeywordData(labsData);
@@ -238,18 +238,18 @@ class DataForSEOService {
       }
 
       // Fallback to Google Ads API endpoint
-      endpoint = '/keywords_data/google_ads/keywords_for_keywords/live';
-      payload = [{
+      const adsEndpoint = '/keywords_data/google_ads/keywords_for_keywords/live';
+      const adsPayload = [{
         "keywords": [seedKeyword],
         "language_code": "en",
         "location_code": 2036, // Australia
         "limit": limit
       }];
 
-      console.log(`📡 Making API call to: ${this.baseURL}${endpoint}`);
-      console.log(`📤 Payload:`, JSON.stringify(payload, null, 2));
+      console.log(`📡 Making API call to: ${this.baseURL}${adsEndpoint}`);
+      console.log(`📤 Payload:`, JSON.stringify(adsPayload, null, 2));
 
-      const data = await this.callAPI(endpoint, payload);
+      const data = await this.callAPI(adsEndpoint, adsPayload);
       
       console.log(`📥 API Response:`, {
         dataType: typeof data,

@@ -75,7 +75,17 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
             .eq('project_id', project.id);
           
           return {
-            ...project,
+            id: project.id,
+            clientId: project.client_id,
+            name: project.name,
+            description: project.description,
+            dateRangeStart: project.date_range_start,
+            dateRangeEnd: project.date_range_end,
+            status: project.status,
+            assignedTo: project.assigned_to,
+            settings: project.settings,
+            createdAt: project.created_at,
+            updatedAt: project.updated_at,
             keywordCount: count || 0
           };
         })
@@ -111,23 +121,34 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
       
       if (error) throw error;
       
-      // Transform database keywords to KeywordData format
-      const transformedKeywords = (keywords || []).map(keyword => ({
-        keyword: keyword.keyword,
-        searchVolume: keyword.search_volume || undefined,
-        competition: keyword.competition || undefined,
-        source: keyword.source || 'manual',
-        cpc: keyword.cpc || undefined,
-        intent: keyword.search_intent || undefined,
-        clicks: keyword.gsc_clicks || undefined,
-        impressions: keyword.gsc_impressions || undefined,
-        ctr: keyword.gsc_ctr || undefined,
-        position: keyword.gsc_position || undefined,
-        priorityScore: keyword.priority_score || undefined,
-        priorityCategory: keyword.priority_category || undefined,
-        opportunityType: keyword.opportunity_type || undefined,
-        hasClientRanking: keyword.has_client_ranking || false
-      }));
+      // Transform database keywords to KeywordData format with legacy compatibility
+      const transformedKeywords = (keywords || []).map(keyword => {
+        // Handle legacy difficulty to competition conversion
+        const competitionValue = keyword.competition || 
+          (keyword.difficulty ? 
+            (keyword.difficulty <= 30 ? 'LOW' : keyword.difficulty <= 70 ? 'MEDIUM' : 'HIGH') : 
+            undefined);
+
+        // Handle legacy current_position to position conversion
+        const positionValue = keyword.gsc_position || keyword.current_position || undefined;
+
+        return {
+          keyword: keyword.keyword,
+          searchVolume: keyword.search_volume || undefined,
+          competition: competitionValue,
+          source: keyword.source || 'manual',
+          cpc: keyword.cpc || undefined,
+          intent: keyword.search_intent || undefined,
+          clicks: keyword.gsc_clicks || undefined,
+          impressions: keyword.gsc_impressions || undefined,
+          ctr: keyword.gsc_ctr || undefined,
+          position: positionValue,
+          priorityScore: keyword.priority_score || undefined,
+          priorityCategory: keyword.priority_category || undefined,
+          opportunityType: keyword.opportunity_type || undefined,
+          hasClientRanking: keyword.has_client_ranking || false
+        };
+      });
       
       setProjectKeywords(transformedKeywords);
     } catch (error) {
@@ -173,7 +194,21 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString('en-AU', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid Date';
+    }
   };
 
   if (showWizard) {

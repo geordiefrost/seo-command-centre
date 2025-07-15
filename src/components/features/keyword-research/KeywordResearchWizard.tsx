@@ -661,30 +661,69 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       // Save keywords
       setProcessingStatus('Saving keywords...');
       if (discoveredKeywords.length > 0) {
-        const keywordInserts = discoveredKeywords.map(keyword => ({
-          project_id: projectId,
-          keyword: keyword.keyword,
-          search_volume: keyword.searchVolume || null,
-          competition: keyword.competition || null,
-          cpc: keyword.cpc || null,
-          search_intent: keyword.intent || null,
-          source: keyword.source,
-          gsc_clicks: keyword.clicks || null,
-          gsc_impressions: keyword.impressions || null,
-          gsc_ctr: keyword.ctr || null,
-          gsc_position: keyword.position || null,
-          priority_score: keyword.priorityScore || null,
-          priority_category: keyword.priorityCategory || null,
-          opportunity_type: keyword.opportunityType || null,
-          has_client_ranking: keyword.hasClientRanking || false,
-          is_branded: selectedClient?.name ? 
-            keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
-          is_quick_win: keyword.priorityCategory === 'quick-win'
-        }));
+        // Create keyword inserts with defensive field mapping
+        const keywordInserts = discoveredKeywords.map(keyword => {
+          // Convert priority score to integer range 1-3 for legacy compatibility
+          const legacyPriorityScore = keyword.priorityScore ? Math.max(1, Math.min(3, Math.round(keyword.priorityScore))) : null;
+          
+          // Convert string competition to numeric difficulty for legacy compatibility
+          const legacyDifficulty = keyword.competition === 'LOW' ? 25 : 
+                                  keyword.competition === 'MEDIUM' ? 50 : 
+                                  keyword.competition === 'HIGH' ? 85 : null;
 
-        await supabase
-          .from('keywords')
-          .insert(keywordInserts);
+          return {
+            project_id: projectId,
+            keyword: keyword.keyword,
+            search_volume: keyword.searchVolume || null,
+            search_intent: keyword.intent || null,
+            source: keyword.source,
+            is_branded: selectedClient?.name ? 
+              keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
+            is_quick_win: keyword.priorityCategory === 'quick-win',
+            
+            // Legacy fields (original schema)
+            difficulty: legacyDifficulty,
+            priority_score: legacyPriorityScore,
+            current_position: keyword.position ? Math.round(keyword.position) : null,
+            
+            // New fields (if they exist in schema)
+            ...(keyword.competition && { competition: keyword.competition }),
+            ...(keyword.cpc && { cpc: keyword.cpc }),
+            ...(keyword.clicks !== undefined && { gsc_clicks: keyword.clicks }),
+            ...(keyword.impressions !== undefined && { gsc_impressions: keyword.impressions }),
+            ...(keyword.ctr !== undefined && { gsc_ctr: keyword.ctr }),
+            ...(keyword.position !== undefined && { gsc_position: keyword.position }),
+            ...(keyword.priorityScore !== undefined && { priority_score: keyword.priorityScore }),
+            ...(keyword.priorityCategory && { priority_category: keyword.priorityCategory }),
+            ...(keyword.opportunityType && { opportunity_type: keyword.opportunityType }),
+            ...(keyword.hasClientRanking !== undefined && { has_client_ranking: keyword.hasClientRanking })
+          };
+        });
+
+        try {
+          await supabase
+            .from('keywords')
+            .insert(keywordInserts);
+        } catch (insertError) {
+          console.error('Keyword insertion error:', insertError);
+          // Try inserting with minimal fields if full insert fails
+          const minimalInserts = discoveredKeywords.map(keyword => ({
+            project_id: projectId,
+            keyword: keyword.keyword,
+            search_volume: keyword.searchVolume || null,
+            search_intent: keyword.intent || null,
+            source: keyword.source,
+            is_branded: selectedClient?.name ? 
+              keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
+            is_quick_win: keyword.priorityCategory === 'quick-win'
+          }));
+          
+          await supabase
+            .from('keywords')
+            .insert(minimalInserts);
+          
+          console.warn('Inserted keywords with minimal fields due to schema compatibility issues');
+        }
       }
 
       // Create saved project object with all necessary data
@@ -879,14 +918,19 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                   {existingCompetitors.map((competitor) => (
                     <div
                       key={competitor.id}
-                      className={`flex items-center justify-between p-3 border rounded-md cursor-pointer ${
+                      className={`flex items-center justify-between p-3 border rounded-md ${
                         selectedCompetitors.some(c => c.domain === competitor.domain)
                           ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-gray-200'
                       }`}
-                      onClick={() => handleCompetitorToggle(competitor)}
                     >
                       <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedCompetitors.some(c => c.domain === competitor.domain)}
+                          onChange={() => handleCompetitorToggle(competitor)}
+                          className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
                         <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
                           <Building className="h-4 w-4 text-red-600" />
                         </div>
@@ -899,9 +943,6 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-xs text-gray-500">Priority {competitor.priority}</span>
-                        {selectedCompetitors.some(c => c.domain === competitor.domain) && (
-                          <CheckCircle className="h-5 w-5 text-blue-600" />
-                        )}
                       </div>
                     </div>
                   ))}

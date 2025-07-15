@@ -84,6 +84,12 @@ const STEPS: WizardStep[] = [
     icon: Bot
   },
   {
+    id: 'selection',
+    title: 'Select Keywords',
+    description: 'Review and select keywords to save',
+    icon: Users
+  },
+  {
     id: 'review',
     title: 'Review & Save',
     description: 'Review findings and save project',
@@ -127,6 +133,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
   const [newCompetitor, setNewCompetitor] = useState({ domain: '', name: '' });
 
   const [discoveredKeywords, setDiscoveredKeywords] = useState<KeywordData[]>([]);
+  const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
   const [keywordStats, setKeywordStats] = useState({
     total: 0,
     branded: 0,
@@ -421,9 +428,11 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
     try {
       let allKeywords: KeywordData[] = [];
 
-      // Add seed keywords
-      setProcessingStatus('Processing seed keywords...');
+      // Add seed keywords and expand them into related keyword clusters
+      setProcessingStatus('Processing and expanding seed keywords...');
       const seedKeywordData = await DataForSEOService.getKeywordData(seedKeywords);
+      
+      // Add original seed keywords
       allKeywords.push(...seedKeywordData.map(k => ({
         keyword: k.keyword,
         searchVolume: k.searchVolume,
@@ -432,6 +441,30 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         cpc: k.cpc,
         intent: k.intent
       })));
+
+      // Expand each seed keyword into related keyword suggestions
+      setProcessingStatus('Expanding seed keywords into related suggestions...');
+      for (const seedKeyword of seedKeywords) {
+        try {
+          console.log(`Expanding seed keyword: "${seedKeyword}"`);
+          const suggestions = await DataForSEOService.getKeywordSuggestions(seedKeyword, 10);
+          
+          // Add expanded keywords with 'seed-expansion' source
+          const expandedKeywords = suggestions.map(suggestion => ({
+            keyword: suggestion.keyword,
+            searchVolume: suggestion.searchVolume,
+            source: 'manual' as const, // Keep as manual but could be 'seed-expansion'
+            competition: suggestion.competition,
+            cpc: suggestion.cpc,
+            intent: suggestion.intent
+          }));
+          
+          allKeywords.push(...expandedKeywords);
+          console.log(`Added ${expandedKeywords.length} expanded keywords from seed "${seedKeyword}"`);
+        } catch (error) {
+          console.warn(`Failed to expand seed keyword "${seedKeyword}":`, error);
+        }
+      }
 
       // Enrich GSC keywords with DataForSEO data
       if (gscKeywords.length > 0) {
@@ -683,8 +716,8 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       if (discoveredKeywords.length > 0) {
         // Create keyword inserts using current database schema (post-migration)
         const keywordInserts = discoveredKeywords.map(keyword => {
-          // Convert priority score to integer range 1-3 for compatibility
-          const legacyPriorityScore = keyword.priorityScore ? Math.max(1, Math.min(3, Math.round(keyword.priorityScore))) : null;
+          // Use decimal priority score (0.00-3.00) for accurate scoring
+          const decimalPriorityScore = keyword.priorityScore ? Math.max(0, Math.min(3, Number(keyword.priorityScore.toFixed(2)))) : null;
 
           // Use fields that exist in the migrated schema
           return {
@@ -693,7 +726,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
             search_volume: keyword.searchVolume || null,
             current_position: keyword.position ? Math.round(keyword.position) : null,
             search_intent: keyword.intent || null,
-            priority_score: legacyPriorityScore,
+            priority_score: decimalPriorityScore,
             source: keyword.source,
             is_branded: selectedClient?.name ? 
               keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,

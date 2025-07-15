@@ -190,6 +190,59 @@ class DataForSEOService {
       );
     }
   }
+
+  /**
+   * Get keyword suggestions for seed expansion
+   */
+  async getKeywordSuggestions(seedKeyword: string, limit: number = 20): Promise<KeywordData[]> {
+    if (this.useMockData || !this.hasCredentials()) {
+      console.log(`Using mock data for keyword suggestions: "${seedKeyword}"`);
+      // Return mock expanded keywords
+      return [
+        { keyword: `${seedKeyword} services`, searchVolume: 450, competition: 'MEDIUM', cpc: 3.25, intent: 'commercial', trend: [], relatedKeywords: [] },
+        { keyword: `best ${seedKeyword}`, searchVolume: 320, competition: 'HIGH', cpc: 4.50, intent: 'commercial', trend: [], relatedKeywords: [] },
+        { keyword: `${seedKeyword} company`, searchVolume: 280, competition: 'MEDIUM', cpc: 2.85, intent: 'commercial', trend: [], relatedKeywords: [] },
+        { keyword: `${seedKeyword} cost`, searchVolume: 200, competition: 'LOW', cpc: 1.75, intent: 'commercial', trend: [], relatedKeywords: [] },
+        { keyword: `${seedKeyword} tips`, searchVolume: 150, competition: 'LOW', cpc: 0.85, intent: 'informational', trend: [], relatedKeywords: [] }
+      ];
+    }
+
+    try {
+      console.log(`Getting keyword suggestions for seed: "${seedKeyword}"`);
+      
+      // Use DataForSEO's keyword suggestions API
+      const endpoint = '/keywords_data/google_ads/keywords_for_keywords/live';
+      const payload = [{
+        "keywords": [seedKeyword],
+        "language_code": "en",
+        "location_code": 2036, // Australia
+        "limit": limit
+      }];
+
+      const data = await this.callAPI(endpoint, payload);
+      
+      if (data && data.length > 0 && data[0].result && data[0].result.length > 0) {
+        const suggestions = data[0].result[0].items || [];
+        console.log(`Found ${suggestions.length} keyword suggestions for "${seedKeyword}"`);
+        
+        return suggestions.map((item: any) => ({
+          keyword: item.keyword || '',
+          searchVolume: item.search_volume || 0,
+          competition: item.competition || 'UNKNOWN',
+          cpc: item.cpc || 0,
+          intent: this.determineSearchIntent(item.keyword || ''),
+          trend: [],
+          relatedKeywords: []
+        }));
+      }
+      
+      console.warn(`No keyword suggestions found for: ${seedKeyword}`);
+      return [];
+    } catch (error) {
+      console.error(`Error getting keyword suggestions for ${seedKeyword}:`, error);
+      return [];
+    }
+  }
   
   async getKeywordDifficulty(keywords: string[]): Promise<any[]> {
     if (this.useMockData && !this.hasCredentials()) {

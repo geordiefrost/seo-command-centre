@@ -487,28 +487,31 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         }
       }
 
-      // Cross-reference competitor keywords with client's GSC data
-      setProcessingStatus('Cross-referencing competitor keywords with GSC data...');
-      const competitorKeywords = allKeywords.filter(k => k.source === 'competitor');
+      // Final GSC cross-reference: Check ALL discovered keywords for client rankings
+      setProcessingStatus('Cross-referencing all keywords with client GSC data...');
       
-      if (competitorKeywords.length > 0 && selectedClient?.domain) {
+      if (allKeywords.length > 0 && selectedClient?.domain) {
         try {
-          // Get client's GSC data for competitor keywords
-          const competitorKeywordStrings = competitorKeywords.map(k => k.keyword);
-          console.log('Cross-referencing competitor keywords:', competitorKeywordStrings.slice(0, 5));
+          // Extract all unique keyword strings for GSC lookup
+          const allKeywordStrings = [...new Set(allKeywords.map(k => k.keyword))];
+          console.log(`Final GSC cross-reference: checking ${allKeywordStrings.length} unique keywords`);
+          console.log('Sample keywords to check:', allKeywordStrings.slice(0, 10));
           
-          // Get GSC data for all competitor keywords at once
-          const gscResults = await GoogleOAuthService.getSearchConsoleKeywords(
+          // Make fresh GSC call specifically for discovered keywords
+          const finalGSCResults = await GoogleOAuthService.getSearchConsoleKeywords(
             undefined, // Let it auto-detect property
             undefined, // Use default date range
             undefined,
-            1000 // Get more results for cross-referencing
+            2000 // Get comprehensive results for final cross-reference
           );
           
-          // Create a map of GSC keyword performance
-          const gscKeywordMap = new Map();
-          gscResults.forEach(gscKeyword => {
-            gscKeywordMap.set(gscKeyword.keyword.toLowerCase(), {
+          console.log(`Final GSC results: ${finalGSCResults.length} keywords from GSC`);
+          console.log('Sample GSC keywords:', finalGSCResults.slice(0, 5).map(k => k.keyword));
+          
+          // Create comprehensive GSC keyword map
+          const finalGSCMap = new Map();
+          finalGSCResults.forEach(gscKeyword => {
+            finalGSCMap.set(gscKeyword.keyword.toLowerCase().trim(), {
               clicks: gscKeyword.clicks,
               impressions: gscKeyword.impressions,
               ctr: gscKeyword.ctr,
@@ -516,28 +519,28 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
             });
           });
           
-          // Enrich competitor keywords with client's GSC performance data
+          // Cross-reference ALL keywords (manual, competitor, initial GSC) with fresh GSC data
+          let matchCount = 0;
           allKeywords = allKeywords.map(keyword => {
-            if (keyword.source === 'competitor') {
-              const gscData = gscKeywordMap.get(keyword.keyword.toLowerCase());
-              if (gscData) {
-                console.log(`Found GSC data for competitor keyword: ${keyword.keyword}, position: ${gscData.position}`);
-                return {
-                  ...keyword,
-                  clicks: gscData.clicks,
-                  impressions: gscData.impressions,
-                  ctr: gscData.ctr,
-                  position: gscData.position,
-                  hasClientRanking: true // Flag to indicate client ranks for this keyword
-                };
-              }
+            const gscData = finalGSCMap.get(keyword.keyword.toLowerCase().trim());
+            if (gscData) {
+              matchCount++;
+              console.log(`✓ GSC match found: "${keyword.keyword}" (${keyword.source}) - Position: ${gscData.position}, Clicks: ${gscData.clicks}`);
+              return {
+                ...keyword,
+                clicks: gscData.clicks,
+                impressions: gscData.impressions,
+                ctr: gscData.ctr,
+                position: gscData.position,
+                hasClientRanking: true
+              };
             }
             return keyword;
           });
           
-          console.log('Cross-referencing complete. Enhanced competitor keywords with GSC data.');
+          console.log(`✅ Final GSC cross-reference complete: ${matchCount} keywords matched with client rankings`);
         } catch (error) {
-          console.warn('Failed to cross-reference competitor keywords with GSC:', error);
+          console.warn('Failed to perform final GSC cross-reference:', error);
         }
       }
       

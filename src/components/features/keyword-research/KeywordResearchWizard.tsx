@@ -90,9 +90,9 @@ const STEPS: WizardStep[] = [
     icon: Users
   },
   {
-    id: 'review',
-    title: 'Review & Save',
-    description: 'Review findings and save project',
+    id: 'save',
+    title: 'Save Project',
+    description: 'Save selected keywords and project',
     icon: CheckCircle
   }
 ];
@@ -713,35 +713,44 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
 
       // Save keywords
       setProcessingStatus('Saving keywords...');
-      if (discoveredKeywords.length > 0) {
-        // Create keyword inserts using current database schema (post-migration)
-        const keywordInserts = discoveredKeywords.map(keyword => {
-          // Use decimal priority score (0.00-3.00) for accurate scoring
-          const decimalPriorityScore = keyword.priorityScore ? Math.max(0, Math.min(3, Number(keyword.priorityScore.toFixed(2)))) : null;
+      const selectedKeywordList = discoveredKeywords.filter(k => selectedKeywords.has(k.keyword));
+      
+      if (selectedKeywordList.length > 0) {
+        // Create keyword inserts using base database schema fields only
+        const keywordInserts = selectedKeywordList.map(keyword => {
+          // Convert competition string to difficulty integer for base schema
+          let difficultyValue = null;
+          if (keyword.competition) {
+            switch (keyword.competition.toUpperCase()) {
+              case 'LOW': difficultyValue = 25; break;
+              case 'MEDIUM': difficultyValue = 50; break;
+              case 'HIGH': difficultyValue = 75; break;
+              default: difficultyValue = 50; break;
+            }
+          }
 
-          // Use fields that exist in the migrated schema
+          // Convert decimal priority score to integer (1-3) for base schema
+          let integerPriorityScore = null;
+          if (keyword.priorityScore) {
+            integerPriorityScore = Math.max(1, Math.min(3, Math.round(keyword.priorityScore)));
+          }
+
+          // Use only fields that exist in the base database.sql schema
           return {
             project_id: projectId,
             keyword: keyword.keyword,
             search_volume: keyword.searchVolume || null,
+            difficulty: difficultyValue,
             current_position: keyword.position ? Math.round(keyword.position) : null,
+            competition_level: keyword.cpc || null, // Store CPC in competition_level field temporarily
             search_intent: keyword.intent || null,
-            priority_score: decimalPriorityScore,
-            source: keyword.source,
+            priority_score: integerPriorityScore,
+            category: keyword.priorityCategory || null,
+            sub_category: keyword.opportunityType || null,
+            source: keyword.source || 'manual',
             is_branded: selectedClient?.name ? 
               keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
-            is_quick_win: keyword.priorityCategory === 'quick-win',
-            // Use the new competition field from migration
-            competition: keyword.competition || null,
-            // Add new fields that may have been created by migration
-            ...(keyword.cpc && { cpc: keyword.cpc }),
-            ...(keyword.clicks !== undefined && { gsc_clicks: keyword.clicks }),
-            ...(keyword.impressions !== undefined && { gsc_impressions: keyword.impressions }),
-            ...(keyword.ctr !== undefined && { gsc_ctr: keyword.ctr }),
-            ...(keyword.position !== undefined && { gsc_position: keyword.position }),
-            ...(keyword.priorityCategory && { priority_category: keyword.priorityCategory }),
-            ...(keyword.opportunityType && { opportunity_type: keyword.opportunityType }),
-            ...(keyword.hasClientRanking !== undefined && { has_client_ranking: keyword.hasClientRanking })
+            is_quick_win: keyword.priorityCategory === 'quick-win'
           };
         });
 
@@ -772,13 +781,14 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           
           // Try inserting with absolute minimal fields if full insert fails
           console.log('Attempting fallback insertion with minimal fields...');
-          const minimalInserts = discoveredKeywords.map(keyword => ({
+          const minimalInserts = selectedKeywordList.map(keyword => ({
             project_id: projectId,
             keyword: keyword.keyword,
             search_volume: keyword.searchVolume || null,
             source: keyword.source || 'manual',
             is_branded: false,
-            is_quick_win: false
+            is_quick_win: false,
+            priority_score: 2 // Default medium priority
           }));
           
           const { data: fallbackData, error: fallbackError } = await supabase
@@ -814,7 +824,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        keywordCount: discoveredKeywords.length
+        keywordCount: selectedKeywords.size
       };
 
       onComplete(savedProject);
@@ -830,8 +840,14 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
   const nextStep = () => {
     if (currentStep === 3 && discoveredKeywords.length === 0) {
       handleKeywordDiscovery().then(() => {
+        // Initialize all keywords as selected when moving to selection step
+        setSelectedKeywords(new Set(discoveredKeywords.map(k => k.keyword)));
         setCurrentStep(currentStep + 1);
       });
+    } else if (currentStep === 3 && discoveredKeywords.length > 0) {
+      // Initialize all keywords as selected when moving to selection step
+      setSelectedKeywords(new Set(discoveredKeywords.map(k => k.keyword)));
+      setCurrentStep(currentStep + 1);
     } else {
       setCurrentStep(currentStep + 1);
     }
@@ -846,8 +862,9 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       case 0: return projectData.name.trim().length > 0;
       case 1: return seedKeywords.length > 0 || gscKeywords.length > 0;
       case 2: return true; // Competitors are optional
-      case 3: return true;
-      case 4: return discoveredKeywords.length > 0;
+      case 3: return discoveredKeywords.length > 0; // Discovery must be completed
+      case 4: return selectedKeywords.size > 0; // Must select at least one keyword
+      case 5: return selectedKeywords.size > 0; // Must have keywords to save
       default: return true;
     }
   };
@@ -1120,14 +1137,16 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                   </div>
                 </div>
 
-                {/* Full Results Table */}
-                <div className="mt-6">
-                  <KeywordResultsTable 
-                    keywords={discoveredKeywords}
-                    title="Discovered Keywords"
-                    showFilters={true}
-                    showExport={false}
-                  />
+                <div className="mt-6 text-center">
+                  <p className="text-gray-600 mb-4">
+                    Keywords have been successfully discovered and analyzed. 
+                    Click "Next" to review and select which keywords to save.
+                  </p>
+                  <div className="bg-green-50 border border-green-200 rounded-md p-4 inline-block">
+                    <p className="text-green-800 font-medium">
+                      ✓ Ready for keyword selection
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1145,11 +1164,61 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           </div>
         );
 
-      case 4: // Review & Save
+      case 4: // Select Keywords
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Select Keywords to Save</h3>
+                <p className="text-gray-600">
+                  Review the discovered keywords and select which ones to save to your project.
+                </p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => {
+                    if (selectedKeywords.size === discoveredKeywords.length) {
+                      setSelectedKeywords(new Set());
+                    } else {
+                      setSelectedKeywords(new Set(discoveredKeywords.map(k => k.keyword)));
+                    }
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  {selectedKeywords.size === discoveredKeywords.length ? 'Deselect All' : 'Select All'}
+                </button>
+                <div className="text-sm text-gray-600">
+                  {selectedKeywords.size} of {discoveredKeywords.length} selected
+                </div>
+              </div>
+            </div>
+
+            {/* Editable Results Table */}
+            <KeywordResultsTable 
+              keywords={discoveredKeywords}
+              title=""
+              showFilters={true}
+              showExport={false}
+              selectedKeywords={selectedKeywords}
+              onKeywordToggle={(keyword) => {
+                const newSelected = new Set(selectedKeywords);
+                if (newSelected.has(keyword)) {
+                  newSelected.delete(keyword);
+                } else {
+                  newSelected.add(keyword);
+                }
+                setSelectedKeywords(newSelected);
+              }}
+              showSelection={true}
+            />
+          </div>
+        );
+
+      case 5: // Save Project
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Project Summary</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Ready to Save Project</h3>
               
               <div className="bg-gray-50 rounded-md p-4 space-y-3">
                 <div>
@@ -1163,8 +1232,8 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                 </div>
                 
                 <div>
-                  <span className="font-medium text-gray-700">Keywords Found:</span>
-                  <span className="ml-2 text-gray-900">{discoveredKeywords.length}</span>
+                  <span className="font-medium text-gray-700">Keywords to Save:</span>
+                  <span className="ml-2 text-gray-900">{selectedKeywords.size} of {discoveredKeywords.length}</span>
                 </div>
                 
                 <div>
@@ -1189,6 +1258,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
               <h4 className="font-medium text-gray-900 mb-2">Key Insights</h4>
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                 <ul className="space-y-2 text-sm text-blue-800">
+                  <li>• Selected {selectedKeywords.size} keywords for this project</li>
                   <li>• Found {keywordStats.quickWins} quick win opportunities (high volume, low competition)</li>
                   <li>• Identified {keywordStats.commercial} commercial intent keywords for conversion focus</li>
                   <li>• Discovered {keywordStats.informational} informational keywords for content marketing</li>

@@ -38,6 +38,9 @@ interface KeywordResultsTableProps {
   showFilters?: boolean;
   showExport?: boolean;
   onKeywordSelect?: (keyword: KeywordData) => void;
+  selectedKeywords?: Set<string>;
+  onKeywordToggle?: (keyword: string) => void;
+  showSelection?: boolean;
 }
 
 type SortField = 'keyword' | 'searchVolume' | 'competition' | 'clicks' | 'impressions' | 'position' | 'cpc' | 'priorityScore';
@@ -74,7 +77,10 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
   title = 'Discovered Keywords',
   showFilters = true,
   showExport = false,
-  onKeywordSelect
+  onKeywordSelect,
+  selectedKeywords,
+  onKeywordToggle,
+  showSelection = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
@@ -336,6 +342,30 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              {showSelection && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={selectedKeywords?.size === keywords.length && keywords.length > 0}
+                    onChange={() => {
+                      if (onKeywordToggle && selectedKeywords) {
+                        if (selectedKeywords.size === keywords.length) {
+                          // Deselect all
+                          keywords.forEach(k => onKeywordToggle(k.keyword));
+                        } else {
+                          // Select all
+                          keywords.forEach(k => {
+                            if (!selectedKeywords.has(k.keyword)) {
+                              onKeywordToggle(k.keyword);
+                            }
+                          });
+                        }
+                      }
+                    }}
+                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                </th>
+              )}
               <th 
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('keyword')}
@@ -421,6 +451,16 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedKeywords.map((keyword, index) => (
               <tr key={`${keyword.keyword}-${index}`} className="hover:bg-gray-50">
+                {showSelection && (
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={selectedKeywords?.has(keyword.keyword) || false}
+                      onChange={() => onKeywordToggle?.(keyword.keyword)}
+                      className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                  </td>
+                )}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">
                     {keyword.keyword}

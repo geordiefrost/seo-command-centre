@@ -193,20 +193,27 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
     try {
+      if (!dateString) {
+        return 'No date';
+      }
+      
       const date = new Date(dateString);
       // Check if date is valid
       if (isNaN(date.getTime())) {
+        console.warn('Invalid date string:', dateString);
         return 'Invalid Date';
       }
+      
       return date.toLocaleDateString('en-AU', {
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'Australia/Sydney'
       });
     } catch (error) {
-      console.error('Error formatting date:', error);
+      console.error('Error formatting date:', error, 'Input:', dateString);
       return 'Invalid Date';
     }
   };

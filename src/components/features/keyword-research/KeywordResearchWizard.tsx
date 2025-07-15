@@ -862,7 +862,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       case 0: return projectData.name.trim().length > 0;
       case 1: return seedKeywords.length > 0 || gscKeywords.length > 0;
       case 2: return true; // Competitors are optional
-      case 3: return discoveredKeywords.length > 0; // Discovery must be completed
+      case 3: return true; // Allow proceeding to trigger discovery or move to next step
       case 4: return selectedKeywords.size > 0; // Must select at least one keyword
       case 5: return selectedKeywords.size > 0; // Must have keywords to save
       default: return true;

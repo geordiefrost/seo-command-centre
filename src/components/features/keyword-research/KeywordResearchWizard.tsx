@@ -492,14 +492,31 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       
       if (allKeywords.length > 0 && selectedClient?.domain) {
         try {
+          // Detect the correct GSC property for this client (same logic as initial call)
+          let finalGSCProperty: string | undefined;
+          const clientDomain = selectedClient?.domain || 
+                              selectedClient?.searchConsolePropertyId?.replace(/^https?:\/\//, '').replace(/\/$/, '') ||
+                              selectedClient?.websiteUrl?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') ||
+                              'bangdigital.com.au';
+          
+          console.log(`Final GSC cross-reference: detecting property for domain: ${clientDomain}`);
+          const detectionResult = await GoogleOAuthService.detectPrimaryProperty(clientDomain);
+          if (detectionResult.primaryProperty) {
+            finalGSCProperty = detectionResult.primaryProperty;
+            console.log(`✓ Final GSC property detected: ${finalGSCProperty}`);
+          } else {
+            console.warn('No working GSC property found for final cross-reference, using fallback');
+            finalGSCProperty = selectedClient?.searchConsolePropertyId;
+          }
+          
           // Extract all unique keyword strings for GSC lookup
           const allKeywordStrings = [...new Set(allKeywords.map(k => k.keyword))];
           console.log(`Final GSC cross-reference: checking ${allKeywordStrings.length} unique keywords`);
           console.log('Sample keywords to check:', allKeywordStrings.slice(0, 10));
           
-          // Make fresh GSC call specifically for discovered keywords
+          // Make fresh GSC call using the correct client property
           const finalGSCResults = await GoogleOAuthService.getSearchConsoleKeywords(
-            undefined, // Let it auto-detect property
+            finalGSCProperty, // Use the client's detected property
             undefined, // Use default date range
             undefined,
             2000 // Get comprehensive results for final cross-reference

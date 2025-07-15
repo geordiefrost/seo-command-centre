@@ -736,13 +736,23 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           }
 
           // Use only fields that exist in the base database.sql schema
+          // Store additional data in notes field as JSON for preservation
+          const additionalData = {
+            cpc: keyword.cpc,
+            clicks: keyword.clicks,
+            impressions: keyword.impressions,
+            ctr: keyword.ctr,
+            competition: keyword.competition,
+            hasClientRanking: keyword.hasClientRanking
+          };
+
           return {
             project_id: projectId,
             keyword: keyword.keyword,
             search_volume: keyword.searchVolume || null,
             difficulty: difficultyValue,
             current_position: keyword.position ? Math.round(keyword.position) : null,
-            competition_level: keyword.cpc || null, // Store CPC in competition_level field temporarily
+            competition_level: keyword.cpc || null, // Store CPC in available decimal field
             search_intent: keyword.intent || null,
             priority_score: integerPriorityScore,
             category: keyword.priorityCategory || null,
@@ -750,7 +760,8 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
             source: keyword.source || 'manual',
             is_branded: selectedClient?.name ? 
               keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
-            is_quick_win: keyword.priorityCategory === 'quick-win'
+            is_quick_win: keyword.priorityCategory === 'quick-win',
+            notes: JSON.stringify(additionalData) // Store extra data as JSON
           };
         });
 
@@ -781,15 +792,27 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           
           // Try inserting with absolute minimal fields if full insert fails
           console.log('Attempting fallback insertion with minimal fields...');
-          const minimalInserts = selectedKeywordList.map(keyword => ({
-            project_id: projectId,
-            keyword: keyword.keyword,
-            search_volume: keyword.searchVolume || null,
-            source: keyword.source || 'manual',
-            is_branded: false,
-            is_quick_win: false,
-            priority_score: 2 // Default medium priority
-          }));
+          const minimalInserts = selectedKeywordList.map(keyword => {
+            const additionalData = {
+              cpc: keyword.cpc,
+              clicks: keyword.clicks,
+              impressions: keyword.impressions,
+              ctr: keyword.ctr,
+              competition: keyword.competition,
+              hasClientRanking: keyword.hasClientRanking
+            };
+
+            return {
+              project_id: projectId,
+              keyword: keyword.keyword,
+              search_volume: keyword.searchVolume || null,
+              source: keyword.source || 'manual',
+              is_branded: false,
+              is_quick_win: false,
+              priority_score: 2, // Default medium priority
+              notes: JSON.stringify(additionalData) // Store extra data as JSON
+            };
+          });
           
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('keywords')
@@ -1276,6 +1299,114 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
     }
   };
 
+  // Special layout for step 4 (keyword selection) - full width
+  if (currentStep === 4) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="bg-white shadow">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {editingProject ? 'Edit' : 'New'} Keyword Research Project
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Step {currentStep + 1} of {STEPS.length}: {STEPS[currentStep].title}
+                </p>
+              </div>
+              <Button variant="ghost" onClick={onCancel}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+
+          {/* Progress Steps */}
+          <div className="px-6 py-4 bg-gray-50">
+            <div className="flex items-center justify-between max-w-4xl mx-auto">
+              {STEPS.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = index === currentStep;
+                const isCompleted = index < currentStep;
+                
+                return (
+                  <div key={step.id} className="flex items-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        isActive
+                          ? 'bg-blue-600 text-white'
+                          : isCompleted
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-300 text-gray-600'
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle className="h-5 w-5" />
+                      ) : (
+                        <Icon className="h-4 w-4" />
+                      )}
+                    </div>
+                    
+                    <div className="ml-3 hidden md:block">
+                      <div className={`text-sm font-medium ${
+                        isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        {step.title}
+                      </div>
+                    </div>
+                    
+                    {index < STEPS.length - 1 && (
+                      <div className={`w-8 h-0.5 mx-4 ${
+                        isCompleted ? 'bg-green-600' : 'bg-gray-300'
+                      }`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Full-width content */}
+        <div className="bg-white">
+          <div className="px-6 py-6">
+            {renderStepContent()}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-white border-t border-gray-200">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between max-w-4xl mx-auto">
+              {currentStep > 0 ? (
+                <Button
+                  variant="outline"
+                  onClick={prevStep}
+                  icon={ArrowLeft}
+                >
+                  Previous
+                </Button>
+              ) : (
+                <div />
+              )}
+
+              <div className="flex space-x-3">
+                <Button
+                  onClick={nextStep}
+                  disabled={!canProceed() || isProcessing}
+                  icon={isProcessing ? Loader2 : ArrowRight}
+                >
+                  {isProcessing ? 'Processing...' : 'Next'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular layout for other steps
   return (
     <div className="max-w-4xl mx-auto">
       <Card className="overflow-hidden">

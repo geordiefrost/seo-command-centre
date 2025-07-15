@@ -123,8 +123,20 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
       
       // Transform database keywords to KeywordData format with legacy compatibility
       const transformedKeywords = (keywords || []).map(keyword => {
+        // Parse additional data from notes field if it exists
+        let additionalData = {};
+        try {
+          if (keyword.notes) {
+            additionalData = JSON.parse(keyword.notes);
+          }
+        } catch (error) {
+          console.warn('Failed to parse keyword notes JSON:', error);
+        }
+
         // Handle legacy difficulty to competition conversion
-        const competitionValue = keyword.competition || 
+        // First check additionalData, then direct field, then convert from difficulty
+        const competitionValue = additionalData.competition || 
+          keyword.competition || 
           (keyword.difficulty ? 
             (keyword.difficulty <= 30 ? 'LOW' : keyword.difficulty <= 70 ? 'MEDIUM' : 'HIGH') : 
             undefined);
@@ -132,21 +144,24 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
         // Handle legacy current_position to position conversion
         const positionValue = keyword.gsc_position || keyword.current_position || undefined;
 
+        // Get CPC from competition_level field where it was stored
+        const cpcValue = additionalData.cpc || keyword.competition_level || undefined;
+
         return {
           keyword: keyword.keyword,
           searchVolume: keyword.search_volume || undefined,
           competition: competitionValue,
           source: keyword.source || 'manual',
-          cpc: keyword.cpc || undefined,
+          cpc: cpcValue,
           intent: keyword.search_intent || undefined,
-          clicks: keyword.gsc_clicks || undefined,
-          impressions: keyword.gsc_impressions || undefined,
-          ctr: keyword.gsc_ctr || undefined,
+          clicks: additionalData.clicks || keyword.gsc_clicks || undefined,
+          impressions: additionalData.impressions || keyword.gsc_impressions || undefined,
+          ctr: additionalData.ctr || keyword.gsc_ctr || undefined,
           position: positionValue,
           priorityScore: keyword.priority_score || undefined,
-          priorityCategory: keyword.priority_category || undefined,
-          opportunityType: keyword.opportunity_type || undefined,
-          hasClientRanking: keyword.has_client_ranking || false
+          priorityCategory: keyword.priority_category || keyword.category || undefined,
+          opportunityType: keyword.opportunity_type || keyword.sub_category || undefined,
+          hasClientRanking: additionalData.hasClientRanking || keyword.has_client_ranking || false
         };
       });
       

@@ -85,8 +85,8 @@ const STEPS: WizardStep[] = [
   },
   {
     id: 'selection',
-    title: 'Select Keywords',
-    description: 'Review and select keywords to save',
+    title: 'Review Keywords',
+    description: 'Review and remove unwanted keywords',
     icon: Users
   },
   {
@@ -428,20 +428,15 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
     try {
       let allKeywords: KeywordData[] = [];
 
-      // Add seed keywords and expand them into related keyword clusters
-      setProcessingStatus('Processing and expanding seed keywords...');
-      const seedKeywordData = await DataForSEOService.getKeywordData(seedKeywords);
+      // PHASE 1: COLLECT RAW KEYWORDS FROM ALL SOURCES
       
-      // Add original seed keywords
-      allKeywords.push(...seedKeywordData.map(k => ({
-        keyword: k.keyword,
-        searchVolume: k.searchVolume,
-        source: 'manual' as const,
-        competition: k.competition,
-        cpc: k.cpc,
-        intent: k.intent
+      // Add seed keywords (raw, no DataForSEO calls yet)
+      setProcessingStatus('Collecting seed keywords...');
+      allKeywords.push(...seedKeywords.map(keyword => ({
+        keyword: keyword,
+        source: 'manual' as const
       })));
-
+      
       // Expand each seed keyword into related keyword suggestions
       setProcessingStatus('Expanding seed keywords into related suggestions...');
       for (const seedKeyword of seedKeywords) {
@@ -449,14 +444,10 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           console.log(`Expanding seed keyword: "${seedKeyword}"`);
           const suggestions = await DataForSEOService.getKeywordSuggestions(seedKeyword, 10);
           
-          // Add expanded keywords with 'seed-expansion' source
+          // Add expanded keywords (raw, no additional processing yet)
           const expandedKeywords = suggestions.map(suggestion => ({
             keyword: suggestion.keyword,
-            searchVolume: suggestion.searchVolume,
-            source: 'manual' as const, // Keep as manual but could be 'seed-expansion'
-            competition: suggestion.competition,
-            cpc: suggestion.cpc,
-            intent: suggestion.intent
+            source: 'manual' as const // Keep as manual but could be 'seed-expansion'
           }));
           
           allKeywords.push(...expandedKeywords);
@@ -466,58 +457,81 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         }
       }
 
-      // Enrich GSC keywords with DataForSEO data
+      // Add GSC keywords (raw, preserve GSC data but no DataForSEO enrichment yet)
+      setProcessingStatus('Collecting GSC keywords...');
       if (gscKeywords.length > 0) {
-        setProcessingStatus('Enriching GSC keywords with volume and competition data...');
-        try {
-          const gscKeywordStrings = gscKeywords.map(k => k.keyword);
-          const enrichedGSCData = await DataForSEOService.getKeywordData(gscKeywordStrings);
-          
-          // Merge GSC performance data with DataForSEO volume/competition data
-          const mergedGSCKeywords = gscKeywords.map(gscKeyword => {
-            const dataForSEOData = enrichedGSCData.find(d => 
-              d.keyword.toLowerCase() === gscKeyword.keyword.toLowerCase()
-            );
-            
-            return {
-              ...gscKeyword,
-              searchVolume: dataForSEOData?.searchVolume || gscKeyword.searchVolume,
-              cpc: dataForSEOData?.cpc || gscKeyword.cpc,
-              competition: dataForSEOData?.competition || gscKeyword.competition,
-              intent: dataForSEOData?.intent || gscKeyword.intent
-            };
-          });
-          
-          allKeywords.push(...mergedGSCKeywords);
-        } catch (error) {
-          console.warn('Failed to enrich GSC keywords with DataForSEO data:', error);
-          // Fallback to original GSC keywords without enrichment
-          allKeywords.push(...gscKeywords);
-        }
+        allKeywords.push(...gscKeywords);
       }
 
-      // Process competitor keywords
+      // Add competitor keywords (raw, no DataForSEO enrichment yet)
+      setProcessingStatus('Collecting competitor keywords...');
       for (const competitor of selectedCompetitors) {
-        setProcessingStatus(`Analyzing ${competitor.domain}...`);
-        
         try {
           const competitorKeywords = await DataForSEOService.getCompetitorRankings(competitor.domain);
           
+          // Add raw competitor keywords without DataForSEO enrichment
           const competitorData = competitorKeywords.slice(0, 50).map((k: any) => ({
             keyword: k.keyword,
-            searchVolume: k.volume || 0,
-            source: 'competitor' as const,
-            competition: ['LOW', 'MEDIUM', 'HIGH'][Math.floor(Math.random() * 3)], // Mock competition
-            cpc: Math.random() * 5,
-            intent: ['informational', 'commercial', 'transactional', 'navigational'][
-              Math.floor(Math.random() * 4)
-            ] as any
+            source: 'competitor' as const
           }));
 
           allKeywords.push(...competitorData);
         } catch (error) {
           console.warn(`Failed to get keywords for ${competitor.domain}:`, error);
         }
+      }
+
+      // PHASE 2: BATCH DATAFORSEO ENRICHMENT FOR ALL KEYWORDS
+      setProcessingStatus('Enriching all keywords with DataForSEO (Volume, Competition, CPC, Intent)...');
+      
+      // Remove duplicates before enrichment
+      const uniqueKeywordMap = new Map();
+      allKeywords.forEach(keyword => {
+        const key = keyword.keyword.toLowerCase().trim();
+        if (!uniqueKeywordMap.has(key)) {
+          uniqueKeywordMap.set(key, keyword);
+        }
+      });
+      
+      const uniqueKeywords = Array.from(uniqueKeywordMap.values());
+      const keywordStrings = uniqueKeywords.map(k => k.keyword);
+      
+      console.log(`🔄 Batch DataForSEO enrichment: processing ${keywordStrings.length} unique keywords`);
+      
+      try {
+        // Batch process all keywords through DataForSEO
+        const enrichedData = await DataForSEOService.getKeywordData(keywordStrings);
+        
+        // Create enrichment map
+        const enrichmentMap = new Map();
+        enrichedData.forEach(data => {
+          enrichmentMap.set(data.keyword.toLowerCase().trim(), data);
+        });
+        
+        // Apply enrichment to all keywords (preserving existing GSC data)
+        allKeywords = uniqueKeywords.map(keyword => {
+          const enrichment = enrichmentMap.get(keyword.keyword.toLowerCase().trim());
+          
+          return {
+            ...keyword,
+            // Preserve existing GSC data, supplement with DataForSEO
+            searchVolume: enrichment?.searchVolume || keyword.searchVolume || 0,
+            competition: enrichment?.competition || keyword.competition || 'UNKNOWN',
+            cpc: enrichment?.cpc || keyword.cpc || 0,
+            intent: enrichment?.intent || keyword.intent || 'informational',
+            // Keep GSC performance data if it exists
+            clicks: keyword.clicks,
+            impressions: keyword.impressions,
+            ctr: keyword.ctr,
+            position: keyword.position
+          };
+        });
+        
+        console.log(`✅ DataForSEO enrichment complete: ${allKeywords.length} keywords enriched`);
+      } catch (error) {
+        console.warn('Failed to batch enrich keywords with DataForSEO:', error);
+        // Continue with unenriched keywords
+        allKeywords = uniqueKeywords;
       }
 
       // Final GSC cross-reference: Check ALL discovered keywords for client rankings
@@ -594,14 +608,9 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
         }
       }
       
-      // Remove duplicates and calculate stats
-      const uniqueKeywords = allKeywords.filter((keyword, index, self) =>
-        index === self.findIndex(k => k.keyword.toLowerCase() === keyword.keyword.toLowerCase())
-      );
-      
       // Apply priority scoring to all keywords
       setProcessingStatus('Calculating keyword priorities...');
-      const keywordsWithPriority = uniqueKeywords.map(keyword => {
+      const keywordsWithPriority = allKeywords.map(keyword => {
         const priorityData = calculatePriorityScore(keyword);
         return {
           ...keyword,
@@ -617,18 +626,18 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       setDiscoveredKeywords(keywordsWithPriority);
 
       // Calculate stats
-      const branded = uniqueKeywords.filter(k => 
+      const branded = keywordsWithPriority.filter(k => 
         selectedClient?.name && k.keyword.toLowerCase().includes(selectedClient.name.toLowerCase())
       ).length;
 
-      const commercial = uniqueKeywords.filter(k => k.intent === 'commercial').length;
-      const informational = uniqueKeywords.filter(k => k.intent === 'informational').length;
-      const quickWins = uniqueKeywords.filter(k => 
+      const commercial = keywordsWithPriority.filter(k => k.intent === 'commercial').length;
+      const informational = keywordsWithPriority.filter(k => k.intent === 'informational').length;
+      const quickWins = keywordsWithPriority.filter(k => 
         (k.searchVolume || 0) > 100 && k.competition === 'LOW'
       ).length;
 
       setKeywordStats({
-        total: uniqueKeywords.length,
+        total: keywordsWithPriority.length,
         branded,
         commercial,
         informational,
@@ -863,12 +872,12 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
   const nextStep = () => {
     if (currentStep === 3 && discoveredKeywords.length === 0) {
       handleKeywordDiscovery().then(() => {
-        // Initialize all keywords as selected when moving to selection step
+        // Initialize ALL keywords as selected by default for removal interface
         setSelectedKeywords(new Set(discoveredKeywords.map(k => k.keyword)));
         setCurrentStep(currentStep + 1);
       });
     } else if (currentStep === 3 && discoveredKeywords.length > 0) {
-      // Initialize all keywords as selected when moving to selection step
+      // Initialize ALL keywords as selected by default for removal interface
       setSelectedKeywords(new Set(discoveredKeywords.map(k => k.keyword)));
       setCurrentStep(currentStep + 1);
     } else {
@@ -886,8 +895,8 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       case 1: return seedKeywords.length > 0 || gscKeywords.length > 0;
       case 2: return true; // Competitors are optional
       case 3: return true; // Allow proceeding to trigger discovery or move to next step
-      case 4: return selectedKeywords.size > 0; // Must select at least one keyword
-      case 5: return selectedKeywords.size > 0; // Must have keywords to save
+      case 4: return discoveredKeywords.length > 0; // Must have keywords to proceed (selection is for removal)
+      case 5: return discoveredKeywords.length > 0; // Must have keywords to save
       default: return true;
     }
   };
@@ -1192,9 +1201,9 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-lg font-medium text-gray-900">Select Keywords to Save</h3>
+                <h3 className="text-lg font-medium text-gray-900">Review Keywords to Save</h3>
                 <p className="text-gray-600">
-                  Review the discovered keywords and select which ones to save to your project.
+                  All keywords are selected by default. Uncheck any keywords you want to remove from your project.
                 </p>
               </div>
               <div className="flex items-center space-x-4">
@@ -1208,7 +1217,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                   }}
                   className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                 >
-                  {selectedKeywords.size === discoveredKeywords.length ? 'Deselect All' : 'Select All'}
+                  {selectedKeywords.size === discoveredKeywords.length ? 'Remove All' : 'Keep All'}
                 </button>
                 <button
                   onClick={() => {
@@ -1217,12 +1226,12 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                   disabled={selectedKeywords.size === 0}
                   className="text-sm text-red-600 hover:text-red-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
                 >
-                  Remove All Selected
+                  Remove All Keywords
                 </button>
                 <div className="text-sm text-gray-600">
-                  <span className={`font-medium ${selectedKeywords.size > 0 ? 'text-blue-600' : ''}`}>
+                  <span className={`font-medium ${selectedKeywords.size > 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {selectedKeywords.size}
-                  </span> of {discoveredKeywords.length} selected
+                  </span> of {discoveredKeywords.length} keywords will be saved
                 </div>
               </div>
             </div>
@@ -1292,7 +1301,7 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
               <h4 className="font-medium text-gray-900 mb-2">Key Insights</h4>
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                 <ul className="space-y-2 text-sm text-blue-800">
-                  <li>• Selected {selectedKeywords.size} keywords for this project</li>
+                  <li>• Saving {selectedKeywords.size} keywords to this project</li>
                   <li>• Found {keywordStats.quickWins} quick win opportunities (high volume, low competition)</li>
                   <li>• Identified {keywordStats.commercial} commercial intent keywords for conversion focus</li>
                   <li>• Discovered {keywordStats.informational} informational keywords for content marketing</li>

@@ -661,29 +661,34 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       // Save keywords
       setProcessingStatus('Saving keywords...');
       if (discoveredKeywords.length > 0) {
-        // Create keyword inserts using only original schema fields to avoid conflicts
+        // Create keyword inserts using current database schema (post-migration)
         const keywordInserts = discoveredKeywords.map(keyword => {
-          // Convert priority score to integer range 1-3 for original schema
+          // Convert priority score to integer range 1-3 for compatibility
           const legacyPriorityScore = keyword.priorityScore ? Math.max(1, Math.min(3, Math.round(keyword.priorityScore))) : null;
-          
-          // Convert string competition to numeric difficulty for original schema
-          const legacyDifficulty = keyword.competition === 'LOW' ? 25 : 
-                                  keyword.competition === 'MEDIUM' ? 50 : 
-                                  keyword.competition === 'HIGH' ? 85 : null;
 
-          // Use only fields that exist in the original schema
+          // Use fields that exist in the migrated schema
           return {
             project_id: projectId,
             keyword: keyword.keyword,
             search_volume: keyword.searchVolume || null,
-            difficulty: legacyDifficulty,
             current_position: keyword.position ? Math.round(keyword.position) : null,
             search_intent: keyword.intent || null,
             priority_score: legacyPriorityScore,
             source: keyword.source,
             is_branded: selectedClient?.name ? 
               keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
-            is_quick_win: keyword.priorityCategory === 'quick-win'
+            is_quick_win: keyword.priorityCategory === 'quick-win',
+            // Use the new competition field from migration
+            competition: keyword.competition || null,
+            // Add new fields that may have been created by migration
+            ...(keyword.cpc && { cpc: keyword.cpc }),
+            ...(keyword.clicks !== undefined && { gsc_clicks: keyword.clicks }),
+            ...(keyword.impressions !== undefined && { gsc_impressions: keyword.impressions }),
+            ...(keyword.ctr !== undefined && { gsc_ctr: keyword.ctr }),
+            ...(keyword.position !== undefined && { gsc_position: keyword.position }),
+            ...(keyword.priorityCategory && { priority_category: keyword.priorityCategory }),
+            ...(keyword.opportunityType && { opportunity_type: keyword.opportunityType }),
+            ...(keyword.hasClientRanking !== undefined && { has_client_ranking: keyword.hasClientRanking })
           };
         });
 

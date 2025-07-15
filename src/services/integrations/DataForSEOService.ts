@@ -448,8 +448,16 @@ class DataForSEOService {
       firstItemKeys: response[0] ? Object.keys(response[0]) : 'none'
     });
     
-    // DataForSEO Labs has a different structure
-    const results = response[0]?.result || [];
+    // DataForSEO Labs structure: response[0].items contains the keyword suggestions
+    const results = response[0]?.items || [];
+    
+    console.log(`📊 DataForSEO Labs items found: ${results.length}`);
+    if (results.length > 0) {
+      console.log('📋 Sample Labs items structure:', {
+        firstItemKeys: Object.keys(results[0]),
+        sampleItems: results.slice(0, 3)
+      });
+    }
     
     return results.map((item: any, index: number) => {
       if (index < 2) {

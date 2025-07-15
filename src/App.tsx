@@ -9,6 +9,7 @@ import { Dashboard, Login, Strategy, Content, Monitoring, Migration, Competitive
 import { GoogleOAuthCallback } from './components/auth/GoogleOAuthCallback';
 import { mockTools, mockIntegrationData } from './mock';
 import { supabase } from './lib/supabase';
+import './utils/dbDebug'; // Import debug utilities
 // import { quickDatabaseTest } from './utils/quickTest';
 
 const queryClient = new QueryClient({

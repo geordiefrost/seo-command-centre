@@ -661,66 +661,81 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
       // Save keywords
       setProcessingStatus('Saving keywords...');
       if (discoveredKeywords.length > 0) {
-        // Create keyword inserts with defensive field mapping
+        // Create keyword inserts using only original schema fields to avoid conflicts
         const keywordInserts = discoveredKeywords.map(keyword => {
-          // Convert priority score to integer range 1-3 for legacy compatibility
+          // Convert priority score to integer range 1-3 for original schema
           const legacyPriorityScore = keyword.priorityScore ? Math.max(1, Math.min(3, Math.round(keyword.priorityScore))) : null;
           
-          // Convert string competition to numeric difficulty for legacy compatibility
+          // Convert string competition to numeric difficulty for original schema
           const legacyDifficulty = keyword.competition === 'LOW' ? 25 : 
                                   keyword.competition === 'MEDIUM' ? 50 : 
                                   keyword.competition === 'HIGH' ? 85 : null;
 
+          // Use only fields that exist in the original schema
           return {
             project_id: projectId,
             keyword: keyword.keyword,
             search_volume: keyword.searchVolume || null,
-            search_intent: keyword.intent || null,
-            source: keyword.source,
-            is_branded: selectedClient?.name ? 
-              keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
-            is_quick_win: keyword.priorityCategory === 'quick-win',
-            
-            // Legacy fields (original schema)
             difficulty: legacyDifficulty,
-            priority_score: legacyPriorityScore,
             current_position: keyword.position ? Math.round(keyword.position) : null,
-            
-            // New fields (if they exist in schema)
-            ...(keyword.competition && { competition: keyword.competition }),
-            ...(keyword.cpc && { cpc: keyword.cpc }),
-            ...(keyword.clicks !== undefined && { gsc_clicks: keyword.clicks }),
-            ...(keyword.impressions !== undefined && { gsc_impressions: keyword.impressions }),
-            ...(keyword.ctr !== undefined && { gsc_ctr: keyword.ctr }),
-            ...(keyword.position !== undefined && { gsc_position: keyword.position }),
-            ...(keyword.priorityScore !== undefined && { priority_score: keyword.priorityScore }),
-            ...(keyword.priorityCategory && { priority_category: keyword.priorityCategory }),
-            ...(keyword.opportunityType && { opportunity_type: keyword.opportunityType }),
-            ...(keyword.hasClientRanking !== undefined && { has_client_ranking: keyword.hasClientRanking })
-          };
-        });
-
-        try {
-          await supabase
-            .from('keywords')
-            .insert(keywordInserts);
-        } catch (insertError) {
-          console.error('Keyword insertion error:', insertError);
-          // Try inserting with minimal fields if full insert fails
-          const minimalInserts = discoveredKeywords.map(keyword => ({
-            project_id: projectId,
-            keyword: keyword.keyword,
-            search_volume: keyword.searchVolume || null,
             search_intent: keyword.intent || null,
+            priority_score: legacyPriorityScore,
             source: keyword.source,
             is_branded: selectedClient?.name ? 
               keyword.keyword.toLowerCase().includes(selectedClient.name.toLowerCase()) : false,
             is_quick_win: keyword.priorityCategory === 'quick-win'
+          };
+        });
+
+        try {
+          console.log('Attempting to insert keywords:', {
+            count: keywordInserts.length,
+            sampleFields: Object.keys(keywordInserts[0] || {}),
+            sampleData: keywordInserts[0]
+          });
+          
+          const { data, error } = await supabase
+            .from('keywords')
+            .insert(keywordInserts);
+            
+          if (error) {
+            throw error;
+          }
+          
+          console.log('Keywords inserted successfully:', keywordInserts.length);
+        } catch (insertError: any) {
+          console.error('Keyword insertion error details:', {
+            error: insertError,
+            message: insertError?.message,
+            details: insertError?.details,
+            hint: insertError?.hint,
+            code: insertError?.code
+          });
+          
+          // Try inserting with absolute minimal fields if full insert fails
+          console.log('Attempting fallback insertion with minimal fields...');
+          const minimalInserts = discoveredKeywords.map(keyword => ({
+            project_id: projectId,
+            keyword: keyword.keyword,
+            search_volume: keyword.searchVolume || null,
+            source: keyword.source || 'manual',
+            is_branded: false,
+            is_quick_win: false
           }));
           
-          await supabase
+          const { data: fallbackData, error: fallbackError } = await supabase
             .from('keywords')
             .insert(minimalInserts);
+          
+          if (fallbackError) {
+            console.error('Fallback insertion also failed:', {
+              error: fallbackError,
+              message: fallbackError.message,
+              details: fallbackError.details,
+              sampleMinimalInsert: minimalInserts[0]
+            });
+            throw new Error(`Keyword insertion failed: ${fallbackError.message}`);
+          }
           
           console.warn('Inserted keywords with minimal fields due to schema compatibility issues');
         }

@@ -123,11 +123,21 @@ const KeywordResearch: React.FC<KeywordResearchPageProps> = () => {
       
       // Transform database keywords to KeywordData format with legacy compatibility
       const transformedKeywords = (keywords || []).map(keyword => {
+        // Define interface for additional data structure
+        interface AdditionalData {
+          cpc?: number;
+          clicks?: number;
+          impressions?: number;
+          ctr?: number;
+          competition?: string;
+          hasClientRanking?: boolean;
+        }
+
         // Parse additional data from notes field if it exists
-        let additionalData = {};
+        let additionalData: AdditionalData = {};
         try {
           if (keyword.notes) {
-            additionalData = JSON.parse(keyword.notes);
+            additionalData = JSON.parse(keyword.notes) as AdditionalData;
           }
         } catch (error) {
           console.warn('Failed to parse keyword notes JSON:', error);

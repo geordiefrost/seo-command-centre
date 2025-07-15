@@ -1206,12 +1206,23 @@ export const KeywordResearchWizard: React.FC<KeywordResearchWizardProps> = ({
                       setSelectedKeywords(new Set(discoveredKeywords.map(k => k.keyword)));
                     }
                   }}
-                  className="text-sm text-blue-600 hover:text-blue-700"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                 >
                   {selectedKeywords.size === discoveredKeywords.length ? 'Deselect All' : 'Select All'}
                 </button>
+                <button
+                  onClick={() => {
+                    setSelectedKeywords(new Set());
+                  }}
+                  disabled={selectedKeywords.size === 0}
+                  className="text-sm text-red-600 hover:text-red-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
+                >
+                  Remove All Selected
+                </button>
                 <div className="text-sm text-gray-600">
-                  {selectedKeywords.size} of {discoveredKeywords.length} selected
+                  <span className={`font-medium ${selectedKeywords.size > 0 ? 'text-blue-600' : ''}`}>
+                    {selectedKeywords.size}
+                  </span> of {discoveredKeywords.length} selected
                 </div>
               </div>
             </div>

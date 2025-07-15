@@ -208,22 +208,60 @@ class DataForSEOService {
     }
 
     try {
-      console.log(`Getting keyword suggestions for seed: "${seedKeyword}"`);
+      console.log(`🔍 Getting keyword suggestions for seed: "${seedKeyword}"`);
+      console.log(`📊 API Configuration:`, {
+        hasCredentials: this.hasCredentials(),
+        useMockData: this.useMockData,
+        baseURL: this.baseURL,
+        loginLength: this.apiLogin?.length || 0
+      });
       
-      // Use DataForSEO's keyword suggestions API
-      const endpoint = '/keywords_data/google_ads/keywords_for_keywords/live';
-      const payload = [{
+      // Try DataForSEO Labs endpoint first (better suggestions)
+      let endpoint = '/dataforseo_labs/google/keyword_suggestions/live';
+      let payload = [{
+        "keyword": seedKeyword,
+        "language_code": "en",
+        "location_code": 2036, // Australia
+        "limit": limit
+      }];
+
+      console.log(`🧪 Trying DataForSEO Labs endpoint first...`);
+      
+      try {
+        const labsData = await this.callAPI(endpoint, payload);
+        if (labsData && labsData.length > 0) {
+          console.log(`✅ DataForSEO Labs endpoint successful`);
+          return this.transformLabsKeywordData(labsData);
+        }
+      } catch (labsError) {
+        console.warn(`⚠️ DataForSEO Labs endpoint failed, trying Google Ads endpoint...`, labsError);
+      }
+
+      // Fallback to Google Ads API endpoint
+      endpoint = '/keywords_data/google_ads/keywords_for_keywords/live';
+      payload = [{
         "keywords": [seedKeyword],
         "language_code": "en",
         "location_code": 2036, // Australia
         "limit": limit
       }];
 
+      console.log(`📡 Making API call to: ${this.baseURL}${endpoint}`);
+      console.log(`📤 Payload:`, JSON.stringify(payload, null, 2));
+
       const data = await this.callAPI(endpoint, payload);
+      
+      console.log(`📥 API Response:`, {
+        dataType: typeof data,
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : 'N/A',
+        structure: data
+      });
       
       if (data && data.length > 0 && data[0].result && data[0].result.length > 0) {
         const suggestions = data[0].result[0].items || [];
-        console.log(`Found ${suggestions.length} keyword suggestions for "${seedKeyword}"`);
+        console.log(`✅ Found ${suggestions.length} keyword suggestions for "${seedKeyword}"`);
+        console.log(`📋 Sample suggestions:`, suggestions.slice(0, 3));
         
         return suggestions.map((item: any) => ({
           keyword: item.keyword || '',
@@ -236,10 +274,16 @@ class DataForSEOService {
         }));
       }
       
-      console.warn(`No keyword suggestions found for: ${seedKeyword}`);
+      console.warn(`⚠️ No keyword suggestions found for: ${seedKeyword}`);
+      console.warn(`📊 API Response Structure:`, JSON.stringify(data, null, 2));
       return [];
     } catch (error) {
-      console.error(`Error getting keyword suggestions for ${seedKeyword}:`, error);
+      console.error(`❌ Error getting keyword suggestions for ${seedKeyword}:`, error);
+      console.error(`🔍 Error details:`, {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
       return [];
     }
   }
@@ -393,6 +437,43 @@ class DataForSEOService {
     return extractedData;
   }
   
+  private transformLabsKeywordData(response: any): KeywordData[] {
+    if (!response || !Array.isArray(response)) {
+      console.warn('DataForSEO Labs response is not an array:', response);
+      return [];
+    }
+    
+    console.log('Transforming DataForSEO Labs data:', {
+      itemCount: response.length,
+      firstItemKeys: response[0] ? Object.keys(response[0]) : 'none'
+    });
+    
+    // DataForSEO Labs has a different structure
+    const results = response[0]?.result || [];
+    
+    return results.map((item: any, index: number) => {
+      if (index < 2) {
+        console.log(`DataForSEO Labs item ${index} field mapping:`, {
+          keyword: item.keyword || 'missing',
+          searchVolume: item.search_volume || 'missing',
+          competition: item.competition || 'missing',
+          cpc: item.cpc || 'missing',
+          availableFields: Object.keys(item)
+        });
+      }
+      
+      return {
+        keyword: item.keyword || '',
+        searchVolume: item.search_volume || 0,
+        competition: item.competition || 'UNKNOWN',
+        cpc: item.cpc || 0,
+        trend: [],
+        relatedKeywords: [],
+        intent: this.determineSearchIntent(item.keyword || ''),
+      };
+    });
+  }
+
   private transformKeywordData(response: any): KeywordData[] {
     if (!response || !Array.isArray(response)) {
       console.warn('DataForSEO response is not an array:', response);

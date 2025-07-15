@@ -449,8 +449,10 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {paginatedKeywords.map((keyword, index) => (
-              <tr key={`${keyword.keyword}-${index}`} className="hover:bg-gray-50">
+            {paginatedKeywords.map((keyword, index) => {
+              const isSelected = selectedKeywords?.has(keyword.keyword) || false;
+              return (
+              <tr key={`${keyword.keyword}-${index}`} className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50 border-blue-200' : ''}`}>
                 {showSelection && (
                   <td className="px-6 py-4 whitespace-nowrap">
                     <input
@@ -554,7 +556,8 @@ export const KeywordResultsTable: React.FC<KeywordResultsTableProps> = ({
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
